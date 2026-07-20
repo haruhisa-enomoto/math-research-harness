@@ -1,0 +1,13 @@
+.research-scratch/
+__pycache__/
+*.pyc
+*~
+.venv/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+
+# Local source workspace. Keep only its usage guide in Git.
+references/*
+!references/README.md

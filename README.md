@@ -1,0 +1,90 @@
+# Math Research Harness
+
+This repository is a starting point for owner-directed mathematical research
+with AI agents. It organizes conversation, evidence, literature, computation,
+scratch work, durable notes, canonical state, and Git checkpoints. Its sample
+inquiry is fictional and uses placeholders such as `Property P`, `Condition A`,
+and `setting S`.
+
+## Start here
+
+- Agents follow [`AGENTS.md`](AGENTS.md); Claude discovers the same contract
+  through [`CLAUDE.md`](CLAUDE.md).
+- Owners can begin with [`docs/OWNER-GUIDE.md`](docs/OWNER-GUIDE.md).
+- The worked interaction is in
+  [`examples/WORKED-SESSION.md`](examples/WORKED-SESSION.md).
+- The generic literature workflow is in
+  [`docs/LITERATURE.md`](docs/LITERATURE.md).
+- Computational reproducibility is described in
+  [`docs/COMPUTATIONS.md`](docs/COMPUTATIONS.md).
+- The fictional canonical state begins at
+  [`threads/INDEX.md`](threads/INDEX.md).
+
+## Prerequisites
+
+The documentation and research-record structure require no software. The
+included Python literature utilities run through `uv`.
+
+| Feature | Owner-installed command-line tools |
+|---|---|
+| Bundled Python utilities | `uv` |
+| arXiv downloads | `curl` |
+| OCR | `ocrmypdf`, `tesseract`, and any needed Tesseract language data |
+| DjVu preparation | `djvused`, `djvutxt`, and `ddjvu` (usually provided by DjVuLibre) |
+
+OCR and DjVu tools are optional. `uv sync --extra literature` installs the
+Python PDF dependencies from `uv.lock`. Run the preflight below to see which
+optional features are available on the current machine.
+
+To enable the PDF utilities:
+
+```bash
+uv sync --extra literature
+uv run --extra literature python tools/literature_preflight.py
+uv run --extra literature python -m unittest discover -s tests
+```
+
+Run the included Python utilities through `uv`.
+
+## Repository map
+
+| Path | Purpose |
+|---|---|
+| `AGENTS.md` | Authoritative session contract: boot, authority, evidence, records, and safety |
+| `CLAUDE.md` | Claude entry point forwarding to the authoritative session contract |
+| `STEERING.md` | Current directions that genuinely apply across research threads |
+| `docs/` | Owner guide and focused workflow policies |
+| `templates/` | Optional starting shapes for new records |
+| `threads/` | One fictional thread showing present-facing canonical state |
+| `examples/` | A worked conversation-to-checkpoint walkthrough |
+| `lib/` | Maintained reusable research code in any language or system |
+| `experiments/` | One-off programs organized by research thread |
+| `data/` | Machine-readable durable outputs and certificates |
+| `results/` | Human-readable summaries paired with durable outputs |
+| `paper/` | Optional live paper material, edited only on explicit owner request |
+| `briefings/` | Optional interface for collaborators without repository access |
+| `references/` | Ignored local source workspace with a tracked usage guide |
+| `.research-scratch/` | Ignored disposable workspace created only when needed |
+| `tools/` | Literature acquisition, preparation, and catalog utilities |
+| `tests/` | Offline unit tests for the reusable harness tools |
+
+## Design principles
+
+1. Conversation controls the work; the owner does not operate the harness.
+2. Load only the context the current task needs.
+3. Scope, evidence strength, significance, and publication authority are
+   separate decisions.
+4. Continue while a credible next step has worthwhile expected value.
+5. Keep fluid work in scratch; preserve only coherent durable packages.
+6. Let canonical state describe the present and Git preserve history.
+7. Treat opportunities as a map, not an assignment queue.
+
+Computational work can use GAP, SageMath, Mathematica, Macaulay2, Magma, Lean,
+Python, Julia, Rust, or other systems appropriate to the project. Record the
+software and version when a result depends on them.
+
+This is a ready-to-edit template rather than an initializer application. Rename
+the fictional thread, replace its example state, and adapt the owner-facing
+language to the project.
+
+The template is available under the [`MIT License`](LICENSE).

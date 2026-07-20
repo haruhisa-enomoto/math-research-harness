@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "paper:<stable-slug>",
+  "kind": "paper",
+  "key": "<stable-slug>",
+  "bibliographic_identity": {
+    "authors": [],
+    "title": "",
+    "year": null,
+    "persistent_identifier": "",
+    "exact_version": ""
+  },
+  "checked_at": "<OS-derived ISO timestamp>",
+  "item_path": "items/papers/<stable-slug>",
+  "resources": {
+    "pdf": {
+      "path": "items/papers/<stable-slug>/original/paper.pdf",
+      "sha256": "<sha256>"
+    }
+  }
+}
