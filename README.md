@@ -22,26 +22,27 @@ and `setting S`.
 
 ## Prerequisites
 
-The documentation and research-record structure require no software. The
-included Python literature utilities run through `uv`.
+Git records durable checkpoints. The included Python and PDF utilities run
+through `uv`, which installs their locked Python packages.
 
 | Feature | Owner-installed command-line tools |
 |---|---|
-| Bundled Python utilities | `uv` |
+| Repository workflow | `git` |
+| Python and PDF utilities | `uv` |
 | arXiv downloads | `curl` |
 | OCR | `ocrmypdf`, `tesseract`, and any needed Tesseract language data |
 | DjVu preparation | `djvused`, `djvutxt`, and `ddjvu` (usually provided by DjVuLibre) |
 
-OCR and DjVu tools are optional. `uv sync --extra literature` installs the
-Python PDF dependencies from `uv.lock`. Run the preflight below to see which
-optional features are available on the current machine.
+`uv sync` installs PyMuPDF and FontTools from `uv.lock`. OCR and DjVu tools are
+optional. Run the preflight below to see which features are available on the
+current machine.
 
-To enable the PDF utilities:
+To prepare the environment and run the tests:
 
 ```bash
-uv sync --extra literature
-uv run --extra literature python tools/literature_preflight.py
-uv run --extra literature python -m unittest discover -s tests
+uv sync
+uv run python tools/literature_preflight.py
+uv run python -m unittest discover -s tests
 ```
 
 Run the included Python utilities through `uv`.

@@ -63,19 +63,16 @@ wheels = [
 name = "math-research-harness"
 version = "0.1.0"
 source = { virtual = "." }
-
-[package.optional-dependencies]
-literature = [
+dependencies = [
     { name = "fonttools" },
     { name = "pymupdf" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "fonttools", marker = "extra == 'literature'", specifier = ">=4.40" },
-    { name = "pymupdf", marker = "extra == 'literature'", specifier = ">=1.24" },
+    { name = "fonttools", specifier = ">=4.40" },
+    { name = "pymupdf", specifier = ">=1.24" },
 ]
-provides-extras = ["literature"]
 
 [[package]]
 name = "pymupdf"

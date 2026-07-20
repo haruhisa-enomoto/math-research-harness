@@ -22,6 +22,7 @@ def main() -> None:
                 "djvused",
                 "djvutxt",
                 "ddjvu",
+                "c44",
             )
         },
     }

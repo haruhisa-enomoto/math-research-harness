@@ -90,7 +90,7 @@ For a local PDF or DjVu file, let the preparation tool choose native extraction
 when a usable text layer exists and OCR otherwise:
 
 ```bash
-uv run --extra literature python tools/prepare_reference.py path/to/source.pdf \
+uv run python tools/prepare_reference.py path/to/source.pdf \
   --slug stable-source-name \
   --pages 1-12
 ```
@@ -108,7 +108,7 @@ languages. Focused page ranges are preferable for large books. See
 Render pages when layout, a diagram, or visual verification matters:
 
 ```bash
-uv run --extra literature python tools/render_pdf_pages.py \
+uv run python tools/render_pdf_pages.py \
   --pdf path/to/source.pdf \
   --pages 20-22
 ```
@@ -116,7 +116,7 @@ uv run --extra literature python tools/render_pdf_pages.py \
 For a custom extraction, use the lower-level tool:
 
 ```bash
-uv run --extra literature python tools/extract_pdf_text.py \
+uv run python tools/extract_pdf_text.py \
   --pdf path/to/source.pdf \
   --pages 1-12 \
   --out references/derived/text/stable-source-name.txt \
