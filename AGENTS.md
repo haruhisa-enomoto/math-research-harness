@@ -58,6 +58,9 @@ Use ordinary mathematical language in owner-facing communication. Define
 nonstandard notation before relying on it. Distinguish proved, computed,
 refuted, equivalent-strength, conditional, and open statements.
 
+Chat mathematics uses CLI-readable Markdown, plain text, Unicode, and inline
+code rather than assuming a TeX renderer.
+
 Use evidence statuses literally:
 
 - `proved/owner-checked`: the owner explicitly checked the proof;
