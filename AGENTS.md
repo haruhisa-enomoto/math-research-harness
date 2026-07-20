@@ -9,8 +9,10 @@ to operate the harness as a configuration system.
 Read this file first and classify the task.
 
 - Meta or repository work needs no fictional thread state.
-- For mathematical work, read `STEERING.md` and the relevant
-  `threads/<thread>/LEDGER.md`.
+- For mathematical work, read `docs/PROJECT-FOUNDATIONS.md`, then `STEERING.md`
+  and the relevant `threads/<thread>/LEDGER.md`. The foundations file is common
+  mathematical boot state: use it without rederiving its contents or presenting
+  them as new.
 - Read `threads/INDEX.md` only when the thread is unclear or the task concerns
   the thread directory.
 - Follow ledger citations only as the task needs them. Do not load every note or
@@ -129,6 +131,14 @@ are actual consequences.
 Each thread has a compact, present-facing `LEDGER.md`. A large thread may add
 `CLAIMS.md` for exact reusable claims and `ACTIVE.md` for temporary complex-run
 state. Follow `docs/RECORDS.md`.
+
+`docs/PROJECT-FOUNDATIONS.md` is the compact cross-thread mathematical layer.
+It summarizes stable reusable facts and cites the primary thread claims that
+own their exact statements and evidence; it is not a second claim catalog.
+Maintain it incrementally during ordinary canonical checkpoints. Apply its
+admission rule conservatively: correct affected entries in the same checkpoint,
+but leave a new result in its owning thread when project-wide boot value is
+unclear.
 
 At a durable checkpoint, update the note and affected canonical state together.
 Correct false canonical state promptly. Preserve detailed history in notes and

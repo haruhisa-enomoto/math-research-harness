@@ -3,8 +3,9 @@
 This directory supports optional collaboration with agents or mathematicians
 who do not have repository access.
 
-- `outbound/` holds self-contained delegated questions assembled from canonical
-  state rather than memory.
+- `outbound/` holds self-contained delegated questions assembled from
+  `docs/PROJECT-FOUNDATIONS.md`, relevant thread state, and cited evidence
+  rather than memory.
 - `inbound/` holds responses or transcripts with source provenance.
 - `templates/` contains starter documents for both directions.
 

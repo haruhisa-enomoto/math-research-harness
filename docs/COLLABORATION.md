@@ -23,9 +23,11 @@ by one agent.
 
 ## Collaborators without repository access
 
-An outbound briefing is a self-contained research handoff assembled from the
-relevant ledger and cited evidence, not from memory. It states:
+An outbound briefing is a self-contained research handoff assembled from
+`docs/PROJECT-FOUNDATIONS.md`, the relevant ledger, and cited evidence—not from
+memory. It states:
 
+- the applicable common foundations and their evidence status;
 - the exact delegated question;
 - definitions and conventions required to understand it;
 - the established and refuted boundary, with evidence status;

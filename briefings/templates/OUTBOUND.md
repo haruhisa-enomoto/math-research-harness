@@ -2,7 +2,7 @@
 
 Date: <OS-derived date>
 Prepared for: <recipient or audience>
-Prepared from: <ledger and evidence baseline>
+Prepared from: <project foundations, ledger, and evidence baseline>
 Supersedes: none | <earlier briefing>
 
 ## Delegated question
@@ -12,6 +12,11 @@ State one exact question and the desired form of the response.
 ## Definitions and conventions
 
 Make the briefing understandable without repository access.
+
+## Applicable project foundations
+
+Include only the common results and scope guards needed for this question, with
+their evidence statuses and primary claim pointers.
 
 ## Established boundary
 

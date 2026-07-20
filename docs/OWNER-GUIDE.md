@@ -48,6 +48,10 @@ paper editing.
 
 ## What the records mean
 
+- The project foundations file is the compact common mathematical boot sheet
+  read before every thread. It records stable cross-thread conventions,
+  results, and scope guards while leaving exact evidence in the owning claim
+  catalog.
 - Scratch holds disposable reasoning and probes.
 - A note preserves one coherent durable package.
 - A ledger describes the present research picture in one sitting.
