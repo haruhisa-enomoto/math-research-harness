@@ -4,6 +4,15 @@ Talk to the agent as you would to a research collaborator. You do not need to
 name a mode, fill in a template, manage notes, edit ledgers, or make commits.
 The agent infers scope from ordinary language and handles repository mechanics.
 
+## Adapting the template
+
+The included contract, sample thread, workflow documents, and environment notes
+are starting points. Describe how you prefer to work, discuss changes with the
+agent, or simply work normally and correct mismatches as they appear. The agent
+can revise the repository to fit your terminology, policies, tools, execution
+environment, and working habits. You do not need to translate those preferences
+into configuration files yourself.
+
 ## Common interactions
 
 > Catch up on the sample inquiry and tell me what you want to do.
@@ -80,9 +89,9 @@ does not imply that you knew or endorsed it. See
 
 ## Computation and collaboration
 
-The harness does not choose a computational backend. When computation becomes
-durable, the agent records its exact scope, command, versions, conventions,
-machine-readable output, and human-readable interpretation. See
+When computation becomes durable, the agent records its exact scope, command,
+versions, conventions, machine-readable output, and human-readable
+interpretation. See
 [`COMPUTATIONS.md`](COMPUTATIONS.md).
 
 A lead agent may optionally delegate independent tasks to internal subagents and

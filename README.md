@@ -83,8 +83,11 @@ Computational work can use GAP, SageMath, Mathematica, Macaulay2, Magma, Lean,
 Python, Julia, Rust, or other systems appropriate to the project. Record the
 software and version when a result depends on them.
 
-This is a ready-to-edit template rather than an initializer application. Rename
-the fictional thread, replace its example state, and adapt the owner-facing
-language to the project.
+This is a working template, not a fixed configuration. When starting a real
+project, agents should replace the fictional thread and adapt the session
+contract, terminology, records, tools, and environment guidance to the owner's
+working practices and the actual repository. The owner can describe preferences
+in ordinary conversation; the agent should turn them into scoped repository
+changes rather than requiring the owner to configure the harness manually.
 
 The template is available under the [`MIT License`](LICENSE).

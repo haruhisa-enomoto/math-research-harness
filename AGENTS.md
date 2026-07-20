@@ -131,6 +131,19 @@ At a durable checkpoint, update the note and affected canonical state together.
 Correct false canonical state promptly. Preserve detailed history in notes and
 Git rather than turning the ledger into a diary.
 
+## Adapting the repository
+
+This contract, directory layout, and sample records are starting points. For a
+real project, learn the owner's working practices from ordinary conversation
+and the repository itself. Within authorized repository work, revise
+`AGENTS.md`, steering and workflow documents, templates, directory conventions,
+tool instructions, and environment guidance to match the actual project.
+
+Preserve existing work and do not invent owner preferences. Ask when an
+adaptation would change research authority, durable owner direction, or another
+material policy choice. Do not require the owner to translate ordinary requests
+into configuration edits.
+
 ## Collaboration and Git
 
 Internal subagents are optional. The lead assigns bounded, nonconflicting work,
