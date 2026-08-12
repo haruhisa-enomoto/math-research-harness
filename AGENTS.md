@@ -23,6 +23,10 @@ Read this file first and classify the task.
   `docs/COLLABORATION.md`.
 - Read `docs/CAMPAIGN-CONTRACT.md` before an exact full-resolution campaign.
 - Read `docs/REPORTS.md` before producing a substantial owner-facing report.
+- Read `docs/PAPER-WRITING.md` before drafting or revising a live research-paper
+  manuscript.
+- Read `docs/FIRST-READER-REVIEW.md` before running or supervising a
+  first-reader review of a manuscript.
 
 ## Authority and scope
 
@@ -80,15 +84,30 @@ and audit load-bearing claims in proportion to their role.
 
 ## Literature
 
-Check the existing local source catalog before beginning discovery. Then search
-appropriate public catalogs and source repositories. Prefer arXiv TeX when it
-is available for exact reading and checkable line locators. Use the PDF
-alongside it when layout, diagrams, page numbering, or visual verification
-matters, and control the exact version when differences matter.
+Check the existing local source catalog before beginning discovery, with
+`uv run python tools/reference_lookup.py` (by author, title, year, keyword, free
+text, or `--grep` inside local text). The catalog records bibliographic identity
+for every local item and for externally held sources with a local derivative, so
+a source is found by what it is. It is an availability index, not a checked
+citation. Then search appropriate public catalogs and source repositories.
+Prefer arXiv TeX when it is available for exact reading and checkable line
+locators. A stable TeX line range is a sufficient locator: do not read, extract,
+or render a PDF merely to recover generated theorem or page numbers. Use the PDF
+only when layout, diagrams, version comparison, or visual verification of
+load-bearing content actually matters, and control the exact version when
+differences matter.
+
+Never invoke `pdftotext`, `pdftoppm`, `djvutxt`, or an OCR command directly.
+Check for an existing derivative first; when PDF or DjVu text is genuinely
+needed, use the repository preparation and extraction tools so that
+page-delimited output and provenance are preserved under `references/derived/`
+for reuse.
 
 Use the ignored `references/` workspace for source files and derivatives. Do
-not modify source originals or treat local availability as owner knowledge or
-endorsement.
+not modify source originals, including originals in an external library, or
+treat local availability as owner knowledge or endorsement. After filing an item
+by hand or producing a new derivative, run `tools/reference_metadata.py` so that
+the catalog describes it.
 
 Use `proved/literature` only after matching the exact claim, assumptions, scope,
 and conventions to an identified source. Record bibliographic identity and a
@@ -97,16 +116,53 @@ load-bearing text against the source image. Follow `docs/LITERATURE.md`.
 
 ## Computations
 
-Use the computational tools chosen for the project. Add a second implementation
-only when it serves a concrete research or verification purpose.
+Use the computational tools chosen for the project and record that choice in
+`docs/ENVIRONMENT.md`. Keep the search and orchestration layer separate from the
+engine that owns the mathematical objects, and do not reimplement that engine in
+temporary host-language code. Add a second implementation only when it serves a
+concrete research or verification purpose; two bindings onto one engine are not
+independent verification. Before depending on a backend in a session, run the
+preflight the project provides for it. Record engine, version, arithmetic
+domain, and the conventions a durable result depends on. See
+`docs/COMPUTATIONS.md`.
 
 Run the repository's Python support utilities through `uv run` and install their
-declared dependencies with `uv sync`. See `docs/ENVIRONMENT.md`.
+declared dependencies with `uv sync`. Agents may add suitable maintained Python
+packages or computational tools themselves when a concrete task benefits from
+them; prefer a dependable existing library to reimplementing commodity
+algorithms. Declare reusable Python dependencies with `uv add`, and keep a new
+dependency only when the measured or maintenance benefit justifies it. See
+`docs/ENVIRONMENT.md`.
 
 Reusable maintained code belongs in `lib/`. One-off programs belong in
 `experiments/<thread>/` and must not be imported as a library. Disposable probes
-belong in `.research-scratch/`. Promote experiment logic to `lib/` with tests
-when it becomes reusable.
+belong in `.research-scratch/`.
+
+Scratch and experiment code are appropriate while an interface is still being
+discovered. When logic starts recurring, or a stable shared boundary would
+materially reduce future duplication, promote that part to a small tested
+`lib/` API and use it in new work. Generalize only as far as an actual workflow
+requires, and do not refactor closed experiments merely for uniformity.
+
+Search campaigns work in closed strata with exact counts, not open-ended
+sampling. Human-facing exact hunts default to no coverage caps. A finite
+optimization budget must preserve exactness by falling through to complete
+work; an explicitly bounded diagnostic must label its incomplete scope.
+Operational failures checkpoint their evidence, stop loudly, and retry
+automatically when the same command is repeated.
+
+For a deterministic closed computation, one successful complete run plus
+targeted sanity checks is normally sufficient. Do not repeat a broad search
+solely to obtain byte-identical output. Run tests relevant to the code and
+risk actually changed; a full repository test suite and formatting checks are
+not routine mathematical-evidence gates. Reserve repeated or independent
+verification for suspected nondeterminism, reusable engine or library changes,
+candidate counterexamples, and unusually load-bearing results.
+
+Keep verification proportional. Do not calculate hashes or add extra audits
+unless they address a concrete risk, such as a large ignored or partitioned
+artifact, an external transfer, suspected nondeterminism, or a candidate
+counterexample.
 
 When a computation supports a durable claim or later comparison, preserve its
 exact command, software and version information, conventions, scope,
@@ -129,8 +185,17 @@ Include `Date:` and `Agent:`. Add `## Canonical implications` only when there
 are actual consequences.
 
 Each thread has a compact, present-facing `LEDGER.md`. A large thread may add
-`CLAIMS.md` for exact reusable claims and `ACTIVE.md` for temporary complex-run
-state. Follow `docs/RECORDS.md`.
+`CLAIMS.md` as a compact prerequisite catalog containing only the strongest
+current non-subsumed reusable claims, and `ACTIVE.md` for temporary complex-run
+state. Claim identifiers are present catalog coordinates, not archival IDs:
+delete entries made unnecessary by stronger claims, renumber consecutively,
+and update present-facing citations rather than retaining compatibility stubs.
+A claim entry contains only its identifier and title, evidence status, exact
+statement, evidence links, and dependencies. The statement must make the
+assertion unambiguous, but the entry must not reproduce its proof or
+computation: proof sketches, census details, witnesses, verification
+narratives, implementation details, and route history belong in the linked
+notes or results. Follow `docs/RECORDS.md`.
 
 `docs/PROJECT-FOUNDATIONS.md` is the compact cross-thread mathematical layer.
 It summarizes stable reusable facts and cites the primary thread claims that
@@ -171,3 +236,10 @@ provenance and audit load-bearing claims before canonical use. Follow
 Preserve unrelated changes in a dirty tree. Make a scoped imperative commit at
 a coherent durable checkpoint. Do not commit scratch work. Before handoff,
 report relevant uncommitted files and leave repository state intelligible.
+
+When the project has a Git remote, push at durable checkpoints. `data/` is
+ignored in full and never reaches a remote, so a push backs up code, records,
+and ledgers only. Never widen a push to carry data: if an output looks too
+valuable to leave untracked, strengthen its manifest in `results/<thread>/`
+instead. Because `git status` does not show data outputs, name the `data/`
+files a session produced when reporting work at handoff.

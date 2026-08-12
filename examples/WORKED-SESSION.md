@@ -48,9 +48,12 @@ When the result becomes durable, the agent:
 
 1. obtains the timestamp from the operating system;
 2. writes one coherent note under `threads/sample-inquiry/notes/`;
-3. adds an exact claim to `CLAIMS.md` if it is independently reusable;
+3. adds an exact claim to `CLAIMS.md` if it is independently reusable and not
+   already subsumed by an entry there, deleting and renumbering any entry the
+   new one makes unnecessary;
 4. updates the ledger only with the changed present-facing consequence;
-5. runs the repository check; and
+5. runs `uv run python tools/audit_claim_catalog.py --strict` on a catalog it
+   restructured, plus any test relevant to code it changed; and
 6. commits the package and canonical changes together.
 
 The sample result in this repository illustrates that checkpoint.
@@ -88,13 +91,31 @@ result becomes durable, it moves the one-off program to
 `experiments/sample-inquiry/`, the machine-readable output to
 `data/sample-inquiry/`, and the explanation to `results/sample-inquiry/`.
 
-The summary records the exact command, backend and versions, conventions,
-finite scope, and remaining limitation. A positive finite pattern remains
-`verified-computationally` at that scope. A refuting witness also receives a
-small certificate verifier and a mathematical note explaining why it is a
-counterexample.
+The output under `data/` is ignored by Git and stays on local disk, so the
+tracked summary in `results/` carries the manifest: the exact command, backend
+and versions, conventions, finite scope, the `data/` path, and the remaining
+limitation. A positive finite pattern remains `verified-computationally` at
+that scope. A refuting witness also receives a small certificate verifier and a
+mathematical note explaining why it is a counterexample.
 
-## 8. When collaboration helps
+A broad search is organized in closed strata with exact counts, and the agent
+reports the scope it actually closed rather than the region it sampled.
+
+## 8. When the owner authorizes the paper
+
+Owner:
+
+> Put this in the paper.
+
+Only then does the agent edit `paper/`. It works to `docs/PAPER-WRITING.md`:
+every term defined before use, every cited result stated with the content
+actually used, computational claims carrying their exact scope, and no trace of
+the conversation, review history, or instructions in the manuscript text. When
+the mathematics has settled, a forward-blind reading follows
+`docs/FIRST-READER-REVIEW.md`, using the templates in
+`templates/first-reader/`.
+
+## 9. When collaboration helps
 
 The lead agent may assign independent, nonconflicting tasks to internal
 subagents—for example a proof attempt and a source check. The lead compares and

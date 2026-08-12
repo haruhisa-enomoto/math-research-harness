@@ -44,7 +44,9 @@ not carry that meaning.
 
 The agent may edit and compile the live paper. Recording progress, preparing a
 research note, or writing a standalone report does not independently authorize
-paper editing.
+paper editing. Once authorized, the agent works to the exposition standards in
+[`PAPER-WRITING.md`](PAPER-WRITING.md), together with any style memo in the
+paper's thread.
 
 ## What the records mean
 
@@ -55,7 +57,8 @@ paper editing.
 - Scratch holds disposable reasoning and probes.
 - A note preserves one coherent durable package.
 - A ledger describes the present research picture in one sitting.
-- A claim catalog stores exact reusable statements and provenance.
+- A claim catalog stores only the strongest current non-subsumed reusable
+  statements and their provenance; notes and Git preserve superseded history.
 - Active state organizes interacting live routes without becoming evidence.
 - Git preserves the evolution between coherent checkpoints.
 
@@ -95,7 +98,9 @@ does not imply that you knew or endorsed it. See
 
 When computation becomes durable, the agent records its exact scope, command,
 versions, conventions, machine-readable output, and human-readable
-interpretation. See
+interpretation. Machine-readable output under `data/` stays on local disk and
+is never committed, so the tracked summary in `results/` carries the manifest
+needed to regenerate and interpret it. See
 [`COMPUTATIONS.md`](COMPUTATIONS.md).
 
 A lead agent may optionally delegate independent tasks to internal subagents and
