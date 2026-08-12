@@ -57,26 +57,70 @@ there. A completed theorem no longer belongs in the opportunity list.
 
 ## Claim catalog
 
-Use `CLAIMS.md` when exact reusable statements would make the ledger cumbersome.
-Give a claim a stable identifier only when it becomes durable. Once cited,
-never renumber or reuse that identifier. Store the exact statement, status,
-evidence, and dependencies; keep full arguments in notes.
+Use `CLAIMS.md` as the compact prerequisite layer for a thread: it contains the
+strongest durable results that a newcomer should know before attempting new
+work. It is not a registry of everything once promoted to a claim, and its
+identifiers are current catalog coordinates rather than permanent archival
+keys. Store the exact statement, status, evidence, and dependencies; keep full
+arguments in notes.
 
-Admit a claim when it can reasonably be cited or reused independently, settles
-a natural subquestion, supplies a reusable construction, records a meaningful
-closed computational scope, or certifies a refutation or correction. Temporary
-conjectures, proof-internal lemmas, immediately superseded statements, and raw
-experiments normally remain outside the catalog.
+Treat `CLAIMS.md` as a compact citation catalog, not as a self-contained proof
+surface. “Exact statement” means that the hypotheses, conclusion, scope, and
+indispensable conventions identify the assertion without ambiguity. It does
+not mean that the entry should explain why the assertion is true. Put proof
+sketches, intermediate lemmas, census counts or partitions, explicit witnesses,
+certificate contents, implementation and verification details, runtimes, and
+route history in the linked note or result. A reader should follow the evidence
+links for the argument.
+
+The normal entry consists only of its identifier and short title, evidence
+status, exact statement, evidence links, and dependencies. Do not copy the
+style of an older oversized entry merely because it is nearby. Existing large
+entries need not be rewritten just for uniformity, but compact one when a
+substantive edit already requires touching it and the exact meaning can be
+preserved safely.
+
+Admit a claim only when it is currently useful in its own right and is not
+strictly subsumed by another catalog claim. A narrower statement may remain
+when it is genuinely stronger in another direction, supplies an independently
+reusable mechanism, or describes the current unresolved frontier. A closed
+finite computation remains only when its exact scope is itself a live reusable
+boundary, not merely because it was once a campaign milestone.
+
+Progressive bound or dimension milestones, proof-internal lemmas, closed
+subcases of a later theorem, route checkpoints, temporary conjectures, and raw
+experiments belong in notes or results rather than the catalog. Dependencies
+name only other independently useful catalog claims; the evidence note owns the
+internal proof dependency graph.
 
 Each exact claim has one primary thread. Other threads cite
-`<thread>:<claim-id>` rather than maintaining competing formulations. If cited
-claims later merge or are superseded, retain a small alias or supersession entry
-so old references continue to resolve.
+`<thread>:<claim-id>` rather than maintaining competing formulations. At every
+canonical checkpoint, reconcile the affected claim lineage. If a stronger claim
+makes an older entry unnecessary, delete the older entry regardless of past
+citations, update present-facing canonical references and dependencies, and
+renumber the surviving catalog consecutively. Do not retain alias or
+supersession entries. Historical notes and Git preserve the old numbering and
+need not be rewritten merely for citation compatibility.
+
+Keep claim headings consecutively numbered from one in reading order. After
+structurally editing a catalog, run
+
+```text
+uv run python tools/audit_claim_catalog.py --strict <path-to-CLAIMS.md>
+```
+
+The audit checks consecutive numbering, required fields, legacy metadata,
+explicit proof/detail sections, forbidden supersession entries, and an
+entry-size review guard. It is a structural backstop, not a substitute for
+semantic curation: an agent must still check that no entry is strictly
+subsumed, that each survivor is useful to a new reader, that its statement
+remains mathematically exact, and that its evidence supports its full scope.
 
 Use the evidence statuses in `AGENTS.md`, splitting a package when its parts
 require different statuses. The catalog contains statements and provenance,
-not full proofs. If an entry becomes an essay, move the argument to a note and
-retain the exact claim plus its evidence links.
+not full proofs. If proof or computational explanation has entered a claim,
+move it to a note or result and retain only the exact claim plus its evidence
+links; do not wait until the entry has become an essay.
 
 ## Active state
 
