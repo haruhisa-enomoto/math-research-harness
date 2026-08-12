@@ -39,6 +39,19 @@ A canonical computational counterexample includes a concise mathematical note,
 a machine-checkable certificate, and a verification program. A computation has
 only its recorded finite scope unless a separate proof extends it.
 
+## Working rhythm
+
+Work in strata (see `docs/COMPUTATIONS.md`, "Search discipline"). One stratum
+ends with a definite statement, a note when durable, a ledger update, and a
+commit. Aim for under an hour per stratum.
+
+Promote a closed negative stratum to a numbered claim when later work will
+cite it.
+
+Construction and theory detours are good when the data shows a pattern. Make
+them bounded units and record them the same way. Do not replace strata or
+detours with open-ended sampling.
+
 ## Checkpoints and handoff
 
 Continue while a credible in-scope step has worthwhile expected value. On an

@@ -11,3 +11,8 @@ dist/
 # Local source workspace. Keep only its usage guide in Git.
 references/*
 !references/README.md
+
+# Machine-readable outputs stay local. The tracked record of a computation is
+# its manifest in results/<thread>/, not the output itself.
+data/*
+!data/README.md

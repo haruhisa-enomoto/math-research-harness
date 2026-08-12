@@ -25,7 +25,7 @@ normalization needed to interpret the output.
 
 - Machine-readable artifact:
 - Certificate or verifier:
-- Expected hash or decisive invariants:
+- Expected hash when useful, or decisive invariants:
 
 ## Result
 
