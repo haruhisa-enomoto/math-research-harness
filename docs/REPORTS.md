@@ -7,6 +7,10 @@ This is a presentation protocol, not a research mode. It changes neither the
 authorized mathematical scope nor the return conditions in
 `docs/RESEARCH-MODES.md`.
 
+This guide does not govern revision of a live research-paper manuscript. For
+that work, read [`PAPER-WRITING.md`](PAPER-WRITING.md); when a task involves
+both a live paper and a separate owner-facing report, use both guides.
+
 ## Scope and audience
 
 Declare the starting knowledge the report assumes. A reader with that knowledge
@@ -59,6 +63,23 @@ details while linking to the records that support its statements.
 Use semantic HTML for prose and structure. Define notation before substantial
 displayed formulas. Use TeX rendered by MathJax for mathematics and keep
 evidence links available without interrupting the main explanation.
+
+For hand-written HTML reports, use dollar delimiters consistently:
+
+```html
+<span class="math inline">$A$</span>
+
+$$
+\operatorname{Ext}^i_A(M,M)=0
+$$
+```
+
+Configure MathJax explicitly with `inlineMath: [['$', '$']]` and
+`displayMath: [['$$', '$$']]`. Do not use `\(...\)` or `\[...\]` delimiters in
+repository HTML reports: backslashes are easily lost while patches or generated
+source are transported through string-escaping layers. Before delivery, check
+that intended inline mathematics still has literal dollar delimiters in the
+saved HTML source.
 
 When inexpensive, check syntax, local links, section anchors, and formula
 delimiter balance. Load the report in a browser only when useful. Extensive

@@ -16,3 +16,7 @@ references/*
 # its manifest in results/<thread>/, not the output itself.
 data/*
 !data/README.md
+
+# Build outputs of the manuscript vocabulary check.
+paper/vocab/corpus.json
+paper/vocab/unigrams.tsv
