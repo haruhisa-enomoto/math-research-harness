@@ -13,6 +13,53 @@ except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
 
 KINDS = {"arxiv": "arxiv", "papers": "paper", "books": "book"}
 
+# Bibliographic fields written by tools/reference_metadata.py into each
+# item.json and mirrored into the catalog so a search never opens 300 files.
+CARRIED_FIELDS = (
+    "bibliographic_identity",
+    "metadata_provenance",
+    "aliases",
+    "derivatives",
+    "citations",
+    "citation_count",
+    "search_text",
+    "metadata_refreshed_at",
+)
+
+
+def display(path: Path, root: Path) -> str:
+    return (Path("references") / path.relative_to(root)).as_posix()
+
+
+def regular_files(path: Path) -> list[Path]:
+    if path.is_file():
+        return [path]
+    return sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
+
+
+def read_json(path: Path) -> dict[str, object]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def external_records(root: Path) -> list[dict[str, object]]:
+    """Externally held sources (inbox, external libraries) known only through derivatives."""
+    external_root = root / "external"
+    if not external_root.is_dir():
+        return []
+    records: list[dict[str, object]] = []
+    for path in sorted(external_root.glob("*.json")):
+        payload = read_json(path)
+        if payload.get("id"):
+            payload["record_path"] = display(path, root)
+            records.append(payload)
+    return records
+
 
 def item_records(root: Path) -> list[tuple[Path, dict[str, object]]]:
     records: list[tuple[Path, dict[str, object]]] = []
@@ -34,26 +81,49 @@ def item_records(root: Path) -> list[tuple[Path, dict[str, object]]]:
 def refresh_catalog(root: Path) -> dict[str, object]:
     root = root.resolve()
     items: list[dict[str, object]] = []
+    described = 0
     for metadata_path, payload in item_records(root):
-        items.append(
-            {
-                "id": payload.get("id"),
-                "kind": payload.get("kind"),
-                "key": payload.get("key"),
-                "item_path": payload.get("item_path"),
-                "metadata_path": metadata_path.relative_to(root).as_posix(),
-                "checked_at": payload.get("checked_at"),
-            }
-        )
+        item_path = metadata_path.parent
+        original_dir = item_path / "original"
+        source_dir = item_path / "source"
+        record: dict[str, object] = {
+            "id": payload.get("id"),
+            "kind": payload.get("kind"),
+            "key": payload.get("key"),
+            "path": display(item_path, root),
+            "item_path": payload.get("item_path"),
+            "metadata_path": metadata_path.relative_to(root).as_posix(),
+            "checked_at": payload.get("checked_at"),
+            "original_files": (
+                [display(path, root) for path in regular_files(original_dir)]
+                if original_dir.is_dir()
+                else []
+            ),
+            "source_file_count": len(regular_files(source_dir)) if source_dir.is_dir() else 0,
+        }
+        for name in CARRIED_FIELDS:
+            if name in payload:
+                record[name] = payload[name]
+        if isinstance(record.get("bibliographic_identity"), dict):
+            described += 1
+        items.append(record)
     items.sort(key=lambda item: str(item.get("id")))
+
+    external = external_records(root)
     catalog = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "items": items,
+        "external_sources": external,
     }
     output = root / "CATALOG.json"
     write_json_atomic(output, catalog)
-    return {"catalog_items": len(items), "path": output.relative_to(root).as_posix()}
+    return {
+        "catalog_items": len(items),
+        "described_items": described,
+        "external_sources": len(external),
+        "path": output.relative_to(root).as_posix(),
+    }
 
 
 def _safe_workspace_path(root: Path, raw: object) -> Path | None:

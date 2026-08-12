@@ -7,7 +7,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.fetch_arxiv import fetch, install_source, normalize_arxiv_id, safe_extract
+from tools.fetch_arxiv import (
+    fetch,
+    fetch_many,
+    install_source,
+    normalize_arxiv_id,
+    safe_extract,
+)
 
 
 class FetchArxivTests(unittest.TestCase):
@@ -81,6 +87,149 @@ class FetchArxivTests(unittest.TestCase):
                 downloader=downloader,
             )
             self.assertIn("unversioned", str(result["version_warning"]))
+
+    def test_fetch_many_is_sequential_and_catalogs_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw)
+            calls: list[str] = []
+
+            def downloader(url: str, destination: Path, headers: Path) -> dict[str, object]:
+                calls.append(url)
+                headers.write_text("HTTP/2 200\n")
+                if "/e-print/" in url:
+                    destination.write_bytes(b"\\documentclass{article}\n")
+                else:
+                    destination.write_bytes(b"%PDF-1.4\n%%EOF\n")
+                return {}
+
+            root = temporary / "references"
+            result = fetch_many(
+                ["2099.00001v1", "2099.00002v3"],
+                root=root,
+                downloader=downloader,
+            )
+
+            self.assertEqual(
+                calls,
+                [
+                    "https://arxiv.org/e-print/2099.00001v1",
+                    "https://arxiv.org/pdf/2099.00001v1",
+                    "https://arxiv.org/e-print/2099.00002v3",
+                    "https://arxiv.org/pdf/2099.00002v3",
+                ],
+            )
+            self.assertEqual(len(result["items"]), 2)
+            self.assertEqual(
+                result["catalog"],
+                {
+                    "catalog_items": 2,
+                    # Both items are described as they are filed, not only in a
+                    # later full tools/reference_metadata.py run.
+                    "described_items": 2,
+                    "external_sources": 0,
+                    "path": "CATALOG.json",
+                },
+            )
+            self.assertEqual(result["audit"], {"status": "ok", "items": 2})
+            self.assertTrue((root / "items/arxiv/2099.00001v1/item.json").is_file())
+            self.assertTrue((root / "items/arxiv/2099.00002v3/item.json").is_file())
+
+    def test_fetch_many_validates_entire_batch_before_downloading(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            calls: list[str] = []
+
+            def downloader(url: str, _destination: Path, _headers: Path) -> dict[str, object]:
+                calls.append(url)
+                return {}
+
+            with self.assertRaises(ValueError):
+                fetch_many(
+                    ["2099.00001v1", "not-an-arxiv-id"],
+                    root=Path(temporary_raw) / "references",
+                    downloader=downloader,
+                )
+            self.assertEqual(calls, [])
+
+    def test_failed_fetch_leaves_no_orphan_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+
+            def downloader(url: str, destination: Path, headers: Path) -> dict[str, object]:
+                if "/e-print/" in url:
+                    headers.write_text("HTTP/2 200\n")
+                    destination.write_bytes(b"\\documentclass{article}\npartial\n")
+                    return {}
+                raise RuntimeError("simulated download failure")
+
+            with self.assertRaisesRegex(RuntimeError, "simulated download failure"):
+                fetch("2099.00001v1", root=root, downloader=downloader)
+
+            self.assertFalse((root / "items/arxiv/2099.00001v1").exists())
+
+    def test_failed_later_batch_item_keeps_earlier_items_catalogable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+
+            def downloader(url: str, destination: Path, headers: Path) -> dict[str, object]:
+                if "2099.00002v1" in url:
+                    raise RuntimeError("simulated later failure")
+                headers.write_text("HTTP/2 200\n")
+                if "/e-print/" in url:
+                    destination.write_bytes(b"\\documentclass{article}\n")
+                else:
+                    destination.write_bytes(b"%PDF-1.4\n%%EOF\n")
+                return {}
+
+            with self.assertRaisesRegex(RuntimeError, "simulated later failure"):
+                fetch_many(
+                    ["2099.00001v1", "2099.00002v1"],
+                    root=root,
+                    downloader=downloader,
+                )
+
+            self.assertTrue((root / "items/arxiv/2099.00001v1/item.json").is_file())
+            self.assertFalse((root / "items/arxiv/2099.00002v1").exists())
+            catalog = json.loads((root / "CATALOG.json").read_text(encoding="utf-8"))
+            self.assertEqual([item["id"] for item in catalog["items"]], ["arxiv:2099.00001v1"])
+
+    def test_failed_force_refresh_preserves_existing_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+
+            def good_downloader(
+                url: str, destination: Path, headers: Path
+            ) -> dict[str, object]:
+                headers.write_text("HTTP/2 200\n")
+                if "/e-print/" in url:
+                    destination.write_bytes(b"\\documentclass{article}\noriginal\n")
+                else:
+                    destination.write_bytes(b"%PDF-1.4\noriginal\n%%EOF\n")
+                return {}
+
+            fetch("2099.00001v1", root=root, downloader=good_downloader)
+            item = root / "items/arxiv/2099.00001v1"
+            metadata_before = (item / "item.json").read_bytes()
+            source_before = (item / "original/source.tex").read_bytes()
+
+            def failing_downloader(
+                url: str, destination: Path, headers: Path
+            ) -> dict[str, object]:
+                if "/e-print/" in url:
+                    headers.write_text("HTTP/2 200\n")
+                    destination.write_bytes(b"\\documentclass{article}\nreplacement\n")
+                    return {}
+                raise RuntimeError("simulated force failure")
+
+            with self.assertRaisesRegex(RuntimeError, "simulated force failure"):
+                fetch(
+                    "2099.00001v1",
+                    root=root,
+                    force=True,
+                    downloader=failing_downloader,
+                )
+
+            self.assertEqual((item / "item.json").read_bytes(), metadata_before)
+            self.assertEqual((item / "original/source.tex").read_bytes(), source_before)
 
     def test_archive_path_traversal_and_links_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_raw:

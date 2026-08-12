@@ -20,7 +20,10 @@ summarizing the source.
 
 ## Checkable locator
 
-Give a theorem, proposition, section, page, or stable local text location.
+Prefer a stable TeX line range when available. Otherwise cite a theorem,
+proposition, section, or page already present in a reusable derivative, or a
+stable local text location. Do not inspect a PDF solely to add rendered
+numbering.
 
 ## Match audit
 

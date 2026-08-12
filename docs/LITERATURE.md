@@ -9,15 +9,22 @@ State what the source needs to establish: the exact claim, assumptions,
 conventions, and scope. Search is more reliable when driven by that statement
 rather than by a broad topic label.
 
-Check the existing local catalog first. Then use focused public discovery,
+Check the existing local catalog first, with `tools/reference_lookup.py`
+(section 5). It records author, title, year, identifiers, keywords, and
+abstract for every local item, so a source can be found by what it is rather
+than by a remembered identifier or slug. Then use focused public discovery,
 following citations backward or forward when that is useful. Prefer primary
 sources for mathematical claims and control the exact version when revisions or
 publication differences may matter.
 
 Prefer arXiv TeX when it is available: it usually preserves definitions,
 formulas, and structure more reliably than PDF text extraction and provides
-checkable line locators. Use the PDF alongside it for diagrams, layout, page or
-theorem numbering, and visual verification of load-bearing text.
+checkable line locators. A stable TeX line range is already a complete
+checkable locator; do not consult, extract, or render a PDF solely to add a
+generated theorem number or PDF page number. Use the PDF alongside TeX only
+when the mathematical task needs a diagram, layout, comparison with a distinct
+published or versioned artifact, or visual verification of load-bearing
+content.
 
 Literature discovery is normally authorized inside an owner-authorized research
 task. It does not independently broaden the mathematical scope.
@@ -37,9 +44,22 @@ references/
     text/                        page-delimited extracted text and metadata
     pages/                       rendered page images
     ocr/                         searchable OCR derivatives
-  CATALOG.json                  generated local inventory
+  external/<slug>.json          records for externally held sources known
+                                 here only through a derivative
+  CATALOG.json                  generated local inventory with bibliographic
+                                 identity per item
+  CATALOG.md                    generated author-sorted reading index
   README.md                     tracked workspace guide
 ```
+
+Within an item, `original/` holds the downloaded artifact, `source/` holds the
+unpacked or directly supplied source tree, and `item.json` holds both download
+provenance and bibliographic identity.
+
+An external library outside this workspace may hold the most suitable paper,
+book, or scan. Read from it, never modify its originals, and put every
+extraction, OCR result, or rendered page under `references/derived/` so that
+the derivative is reusable and its provenance is recorded.
 
 Do not modify source originals. Keep derivatives separate and record which
 source and version produced them. Do not force-add source files merely because
@@ -55,17 +75,18 @@ checkable locators without committing source artifacts.
 ## 3. File a known arXiv item
 
 Use public search or bibliographic discovery to identify the paper. Once the
-identifier is known, fetch one item directly:
+identifiers are known, fetch one or several items directly:
 
 ```bash
 uv run python tools/fetch_arxiv.py VERSIONED_ARXIV_ID
+uv run python tools/fetch_arxiv.py VERSIONED_ID_1 VERSIONED_ID_2
 ```
 
-The helper accepts a modern or old-style identifier and official `abs`, `pdf`,
-or `e-print` URLs. It does not search or query the metadata API. It sequentially
-downloads the source and PDF, safely unpacks tar or gzip source material,
-identifies likely main TeX files, records hashes and response metadata, refreshes
-the local catalog, and audits the result.
+The helper accepts modern or old-style identifiers and official `abs`, `pdf`,
+or `e-print` URLs. It does not search or query the metadata API. It validates a
+multi-item request before downloading, processes the items sequentially, safely
+unpacks tar or gzip source material, identifies likely main TeX files, records
+hashes and response metadata, then refreshes and audits the local catalog once.
 
 Prefer a versioned identifier. An unversioned identifier is allowed, but the
 metadata warns that only the downloaded hashes pin the local bytes. Existing
@@ -79,12 +100,20 @@ Set an informative HTTP identity when appropriate:
 export RESEARCH_HARNESS_USER_AGENT="my-research-project/0.1 (contact@example.org)"
 ```
 
-This is a restrained single-item helper. Do not loop or parallelize it for bulk
-collection. For bulk access, follow the service’s official
+This is a restrained direct-item helper, not a bulk harvester. Do not
+parallelize requests or feed it bulk collections. For bulk access, follow the
+service’s official
 [bulk-data guidance](https://info.arxiv.org/help/bulk_data/index.html) and
 [API terms](https://info.arxiv.org/help/api/index.html).
 
 ## 4. Prepare PDF or DjVu sources
+
+First check `references/derived/text/` and the local catalog for an existing
+reusable derivative. Agents must never invoke `pdftotext`, `pdftoppm`,
+`djvutxt`, or OCR executables directly. Direct commands produce ephemeral
+output and bypass the project's page mapping, metadata, hashes, and reuse
+conventions. Use the repository tools below; those tools may call the same
+system utilities internally while recording their invocation and outputs.
 
 For a local PDF or DjVu file, let the preparation tool choose native extraction
 when a usable text layer exists and OCR otherwise:
@@ -105,7 +134,9 @@ new searchable derivative, and `--language` to select installed recognition
 languages. Focused page ranges are preferable for large books. See
 [`ENVIRONMENT.md`](ENVIRONMENT.md) for optional dependencies.
 
-Render pages when layout, a diagram, or visual verification matters:
+Render pages only when layout, a diagram, or visual verification of
+load-bearing content matters. Do not render them merely to recover generated
+theorem or page numbers:
 
 ```bash
 uv run python tools/render_pdf_pages.py \
@@ -124,24 +155,81 @@ uv run python tools/extract_pdf_text.py \
   --repair-glyphs
 ```
 
+The lower-level extractor always writes metadata. If `--metadata-out` is
+omitted, it creates `<output-stem>.metadata.json` beside the text derivative.
+
 Recognition and PDF text extraction are reading aids, not certified mathematical
 transcriptions. Visually verify load-bearing formulas, symbols, hypotheses, and
 diagrams against the source image.
 
-## 5. Maintain the catalog
+## 5. Search and maintain the catalog
 
-The arXiv helper updates the local catalog automatically. After manually filing
-another item with an `item.json` based on
-[`templates/REFERENCE-ITEM.json`](../templates/REFERENCE-ITEM.json), run:
+### Search
+
+`CATALOG.json` carries title, authors, year, identifiers, keywords, and
+abstract for every local item, plus records for externally held sources present
+only as derivatives. Query it by what the source is:
+
+```bash
+uv run python tools/reference_lookup.py noether invariants
+uv run python tools/reference_lookup.py --author noether --year 1920-1930
+uv run python tools/reference_lookup.py --title "rings of invariants" -v
+uv run python tools/reference_lookup.py --keyword cohomology --json
+uv run python tools/reference_lookup.py --grep "finitely generated"
+```
+
+Matching ignores case, accents, and dash style, so `riemann-roch` matches a
+title typeset `Riemann--Roch` and `erdos` matches `Erdős`. `--grep` searches the
+extracted text and unpacked TeX themselves and prints file and line, which is
+the cheap way to check whether a statement is already available locally.
+`--kind external` covers sources held outside the workspace that have a local
+derivative. `references/CATALOG.md` is the same information as an
+author-sorted reading list.
+
+This is a catalog or targeted-path lookup, not a recursive scan of the
+reference workspace or of an external library.
+
+Catalog identity is extracted from local material, not from a metadata service.
+It is an availability index and a search aid: confirm bibliographic identity in
+the source itself before a `proved/literature` claim, and check the recorded
+provenance (`tools/reference_lookup.py -v`) when a field looks doubtful.
+
+### Maintain
+
+The arXiv helper describes, refreshes, and audits automatically. After manually
+filing another item with an `item.json` based on
+[`templates/REFERENCE-ITEM.json`](../templates/REFERENCE-ITEM.json), or after
+producing a new derivative from an externally held source, run:
 
 ```bash
 uv run python tools/reference_catalog.py --hash path/to/source.pdf
-uv run python tools/reference_catalog.py --refresh-catalog --audit
+uv run python tools/reference_metadata.py
+uv run python tools/reference_catalog.py --audit
+```
+
+`tools/reference_metadata.py` rewrites every `item.json`, the `external/`
+records, `CATALOG.json`, and `CATALOG.md`. It reads only local material — TeX
+sources, PDF document metadata, extracted text, item slugs — and makes no
+network request. Useful options:
+
+```bash
+uv run python tools/reference_metadata.py --item arxiv:1503.01234v2  # one item
+uv run python tools/reference_metadata.py --unpack-originals  # expand archives filed unexpanded
+uv run python tools/reference_metadata.py --force             # also overwrite manual fields
 ```
 
 The audit checks stable identities, workspace-relative paths, catalog freshness,
 and recorded resource hashes. A catalog entry establishes local identity and
 provenance; it does not establish a mathematical claim.
+
+### Correcting a catalog entry
+
+Extraction is a heuristic, and `metadata_provenance` records which source
+supplied each field. When a field is wrong, edit `bibliographic_identity` in
+that item's `item.json` (or `references/external/<slug>.json`) and set the
+matching `metadata_provenance` entry to a string starting with `manual`, for
+example `"title": "manual: checked against the published version"`. Later
+refreshes preserve every field marked that way; only `--force` overwrites them.
 
 ## 6. Separate discovery from verification
 
@@ -155,8 +243,10 @@ For a load-bearing source, verify:
 - every relevant assumption and convention;
 - whether the result has the required scope;
 - dependencies needed to apply it; and
-- a checkable locator such as a theorem number, section, page, or stable local
-  text location.
+- a checkable locator. Prefer a stable TeX line range when TeX is available;
+  otherwise use a section, page, or theorem number already present in a
+  reusable derivative, or a stable local text location. Do not open a PDF
+  merely to make the locator more ornate.
 
 If text extraction or character recognition may have altered a formula,
 hypothesis, or symbol, inspect the source image. Verification effort should

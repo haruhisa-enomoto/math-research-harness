@@ -126,6 +126,8 @@ def extract_pdf(
     pdf = pdf.resolve()
     if not pdf.is_file():
         raise FileNotFoundError(pdf)
+    if metadata_output is None:
+        metadata_output = output.with_name(f"{output.stem}.metadata.json")
 
     repaired: Counter[str] = Counter()
     unresolved: Counter[str] = Counter()
@@ -152,6 +154,7 @@ def extract_pdf(
         "source_pdf": str(pdf),
         "source_sha256": sha256(pdf),
         "output_text": str(output),
+        "metadata_output": str(metadata_output),
         "extracted_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "page_count": page_count,
         "pages_extracted": pages,
@@ -163,8 +166,7 @@ def extract_pdf(
     if repair_glyphs:
         metadata["glyphs_repaired"] = dict(repaired.most_common())
         metadata["glyphs_unresolved"] = dict(unresolved.most_common())
-    if metadata_output is not None:
-        write_json_atomic(metadata_output, metadata)
+    write_json_atomic(metadata_output, metadata)
     return metadata
 
 
@@ -172,7 +174,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Extract page-delimited text from a PDF.")
     parser.add_argument("--pdf", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--metadata-out", type=Path)
+    parser.add_argument(
+        "--metadata-out",
+        type=Path,
+        help="override the default sibling <output-stem>.metadata.json path",
+    )
     parser.add_argument("--pages", help="one-indexed pages, e.g. 1-4 or 1,5,20-22")
     parser.add_argument(
         "--repair-glyphs",

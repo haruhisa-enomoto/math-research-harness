@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "paper:<stable-slug>",
   "kind": "paper",
   "key": "<stable-slug>",
@@ -7,8 +7,17 @@
     "authors": [],
     "title": "",
     "year": null,
+    "arxiv_id": null,
+    "doi": null,
+    "venue": null,
+    "keywords": [],
+    "msc": [],
+    "abstract": null,
     "persistent_identifier": "",
     "exact_version": ""
+  },
+  "metadata_provenance": {
+    "title": "manual: <what was checked, if this field must not be re-extracted>"
   },
   "checked_at": "<OS-derived ISO timestamp>",
   "item_path": "items/papers/<stable-slug>",

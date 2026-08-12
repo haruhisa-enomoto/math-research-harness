@@ -23,6 +23,19 @@ except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
     from reference_utils import sha256, write_json_atomic
 
 
+def describe_item(root: Path, item_id: str) -> None:
+    """Extract bibliographic identity for one freshly filed item.
+
+    The repository citation scan is skipped here; a full
+    `tools/reference_metadata.py` run refreshes it.
+    """
+    try:
+        from tools.reference_metadata import refresh_items
+    except ModuleNotFoundError:
+        from reference_metadata import refresh_items
+    refresh_items(root, Path(__file__).resolve().parents[1], only=item_id, scan_citations=False)
+
+
 MODERN_ID = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?", re.IGNORECASE)
 OLD_ID = re.compile(r"[a-z][a-z0-9.-]*/\d{7}(?:v\d+)?", re.IGNORECASE)
 VERSION = re.compile(r"v\d+$", re.IGNORECASE)
@@ -30,7 +43,7 @@ MAX_ARCHIVE_MEMBERS = 20_000
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
 DEFAULT_USER_AGENT = os.environ.get(
     "RESEARCH_HARNESS_USER_AGENT",
-    "math-research-harness/0.1 (single-item literature helper)",
+    "math-research-harness/0.1 (literature helper)",
 )
 
 
@@ -240,17 +253,10 @@ def fetch(
     key = item_key(arxiv_id)
     root = root.resolve()
     item = root / "items" / "arxiv" / key
-    original = item / "original"
-    source = item / "source"
     metadata_path = item / "item.json"
     previous: dict[str, object] = {}
     if metadata_path.is_file() and not force:
         previous = json.loads(metadata_path.read_text(encoding="utf-8"))
-
-    if item.exists() and force:
-        shutil.rmtree(item)
-        previous = {}
-    original.mkdir(parents=True, exist_ok=True)
 
     previous_resources = previous.get("resources", {})
     resources = dict(previous_resources) if isinstance(previous_resources, dict) else {}
@@ -261,8 +267,29 @@ def fetch(
         )
     )
 
-    with tempfile.TemporaryDirectory(prefix="fetch-arxiv-") as temporary_raw:
+    # Build the complete item beside the destination, then commit it with
+    # same-filesystem renames. A failed source/PDF request must not leave an
+    # orphan directory that makes the catalog unauditable, and --force must
+    # not destroy a valid existing item before its replacement is ready.
+    root.mkdir(parents=True, exist_ok=True)
+    item.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".fetch-arxiv-", dir=root) as temporary_raw:
         temporary = Path(temporary_raw)
+        staged_item = temporary / "item"
+        if item.exists() and metadata_path.is_file() and not force:
+            shutil.copytree(item, staged_item)
+        else:
+            staged_item.mkdir()
+
+        original = staged_item / "original"
+        source = staged_item / "source"
+        staged_metadata_path = staged_item / "item.json"
+        original.mkdir(parents=True, exist_ok=True)
+
+        def final_path(staged_path: Path) -> str:
+            destination = item / staged_path.relative_to(staged_item)
+            return destination.relative_to(root).as_posix()
+
         if want_source:
             existing_sources = sorted(original.glob("source.*"))
             if existing_sources and not force:
@@ -271,7 +298,7 @@ def fetch(
                 resources["source"] = {
                     **(cached if isinstance(cached, dict) else {}),
                     "status": "cached",
-                    "path": stored_source.relative_to(root).as_posix(),
+                    "path": final_path(stored_source),
                     "sha256": sha256(stored_source),
                     "bytes": stored_source.stat().st_size,
                 }
@@ -284,7 +311,7 @@ def fetch(
                 stored_source, extracted = install_source(source_download, original, source)
                 resources["source"] = {
                     "status": "downloaded",
-                    "path": stored_source.relative_to(root).as_posix(),
+                    "path": final_path(stored_source),
                     "sha256": sha256(stored_source),
                     "bytes": stored_source.stat().st_size,
                     **network,
@@ -297,7 +324,7 @@ def fetch(
                 resources["pdf"] = {
                     **(cached if isinstance(cached, dict) else {}),
                     "status": "cached",
-                    "path": stored_pdf.relative_to(root).as_posix(),
+                    "path": final_path(stored_pdf),
                     "sha256": sha256(stored_pdf),
                     "bytes": stored_pdf.stat().st_size,
                 }
@@ -311,33 +338,66 @@ def fetch(
                 shutil.copy2(pdf_download, stored_pdf)
                 resources["pdf"] = {
                     "status": "downloaded",
-                    "path": stored_pdf.relative_to(root).as_posix(),
+                    "path": final_path(stored_pdf),
                     "sha256": sha256(stored_pdf),
                     "bytes": stored_pdf.stat().st_size,
                     **network,
                 }
 
-    checked_at = datetime.now().astimezone().isoformat(timespec="seconds")
-    downloaded = any(
-        isinstance(resource, dict) and resource.get("status") == "downloaded"
-        for resource in resources.values()
-    )
-    payload: dict[str, object] = {
-        "schema_version": 1,
-        "id": f"arxiv:{key}",
-        "kind": "arxiv",
-        "key": key,
-        "arxiv_id": arxiv_id,
-        "versioned": bool(VERSION.search(arxiv_id)),
-        "downloaded_at": checked_at if downloaded else previous.get("downloaded_at", checked_at),
-        "checked_at": checked_at,
-        "item_path": item.relative_to(root).as_posix(),
-        "resources": resources,
-        "extracted_source_files": extracted,
-        "main_tex_candidates": main_tex_candidates(source),
-        "invocation": invocation or ["tools/fetch_arxiv.py", value],
-    }
-    write_json_atomic(metadata_path, payload)
+        checked_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        downloaded = any(
+            isinstance(resource, dict) and resource.get("status") == "downloaded"
+            for resource in resources.values()
+        )
+        # Bibliographic enrichment written by tools/reference_metadata.py survives
+        # a re-file; only download provenance is rewritten here.
+        carried = {
+            name: previous[name]
+            for name in (
+                "bibliographic_identity",
+                "metadata_provenance",
+                "aliases",
+                "derivatives",
+                "citations",
+                "citation_count",
+                "search_text",
+                "metadata_refreshed_at",
+            )
+            if name in previous
+        }
+        payload: dict[str, object] = {
+            **carried,
+            "schema_version": 2,
+            "id": f"arxiv:{key}",
+            "kind": "arxiv",
+            "key": key,
+            "arxiv_id": arxiv_id,
+            "versioned": bool(VERSION.search(arxiv_id)),
+            "downloaded_at": (
+                checked_at if downloaded else previous.get("downloaded_at", checked_at)
+            ),
+            "checked_at": checked_at,
+            "item_path": item.relative_to(root).as_posix(),
+            "resources": resources,
+            "extracted_source_files": extracted,
+            "main_tex_candidates": main_tex_candidates(source),
+            "invocation": invocation or ["tools/fetch_arxiv.py", value],
+        }
+        write_json_atomic(staged_metadata_path, payload)
+
+        previous_item = temporary / "previous-item"
+        if item.exists():
+            item.rename(previous_item)
+        try:
+            staged_item.rename(item)
+        except BaseException:
+            if previous_item.exists() and not item.exists():
+                previous_item.rename(item)
+            raise
+
+    # Describe the committed item even inside a batch, so a fetched source is
+    # searchable by author and title without a separate full metadata run.
+    describe_item(root, f"arxiv:{key}")
 
     catalog_result: dict[str, object] | None = None
     audit_result: dict[str, object] | None = None
@@ -358,11 +418,64 @@ def fetch(
     }
 
 
+def fetch_many(
+    values: list[str],
+    *,
+    root: Path = Path("references"),
+    want_source: bool = True,
+    want_pdf: bool = True,
+    force: bool = False,
+    downloader: Download | None = None,
+    user_agent: str = DEFAULT_USER_AGENT,
+    invocation: list[str] | None = None,
+) -> dict[str, object]:
+    """Fetch known arXiv items sequentially, then refresh and audit once."""
+    if not values:
+        raise ValueError("at least one arXiv identifier is required")
+
+    # Reject a malformed batch before making any network request or filesystem change.
+    normalized = [normalize_arxiv_id(value) for value in values]
+    root = root.resolve()
+    results: list[dict[str, object]] = []
+    try:
+        for arxiv_id in normalized:
+            results.append(
+                fetch(
+                    arxiv_id,
+                    root=root,
+                    want_source=want_source,
+                    want_pdf=want_pdf,
+                    force=force,
+                    downloader=downloader,
+                    user_agent=user_agent,
+                    update_catalog=False,
+                    invocation=invocation
+                    or ["tools/fetch_arxiv.py", *values],
+                )
+            )
+    finally:
+        # Keep successfully completed earlier items discoverable if a later fetch fails.
+        catalog_result = refresh_catalog(root)
+
+    audit_result = audit(root)
+    return {
+        "items": results,
+        "catalog": catalog_result,
+        "audit": audit_result,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="File one known arXiv item by direct source/PDF download; performs no search."
+        description=(
+            "File known arXiv items by sequential direct source/PDF download; performs no search."
+        )
     )
-    parser.add_argument("identifier", help="arXiv identifier or abs/pdf/e-print URL")
+    parser.add_argument(
+        "identifiers",
+        nargs="+",
+        help="one or more arXiv identifiers or official abs/pdf/e-print URLs",
+    )
     parser.add_argument("--root", type=Path, default=Path("references"))
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--source-only", action="store_true")
@@ -375,15 +488,18 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    result = fetch(
-        args.identifier,
-        root=args.root,
-        want_source=not args.pdf_only,
-        want_pdf=not args.source_only,
-        force=args.force,
-        user_agent=args.user_agent,
-        invocation=["tools/fetch_arxiv.py", *sys.argv[1:]],
-    )
+    common = {
+        "root": args.root,
+        "want_source": not args.pdf_only,
+        "want_pdf": not args.source_only,
+        "force": args.force,
+        "user_agent": args.user_agent,
+        "invocation": ["tools/fetch_arxiv.py", *sys.argv[1:]],
+    }
+    if len(args.identifiers) == 1:
+        result = fetch(args.identifiers[0], **common)
+    else:
+        result = fetch_many(args.identifiers, **common)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
