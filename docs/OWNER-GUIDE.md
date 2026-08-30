@@ -51,10 +51,10 @@ style memo in the paper's thread.
 
 ## What the records mean
 
-- The project foundations file is the compact common mathematical boot sheet
-  read before every thread. It records stable cross-thread conventions,
-  results, and scope guards while leaving exact evidence in the owning claim
-  catalog.
+- The project foundations file is an optional shared reference for conventions
+  and scope or transport guards that recur across substantively different
+  threads. The relevant ledger, rather than that file, is the normal
+  mathematical entry point.
 - Scratch holds disposable reasoning and probes.
 - A note preserves one coherent durable package.
 - A ledger describes the present research picture in one sitting.

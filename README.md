@@ -10,8 +10,9 @@ and `setting S`.
 
 - Agents follow [`AGENTS.md`](AGENTS.md); Claude discovers the same contract
   through [`CLAUDE.md`](CLAUDE.md).
-- Shared mathematical boot state lives in
-  [`docs/PROJECT-FOUNDATIONS.md`](docs/PROJECT-FOUNDATIONS.md).
+- Optional cross-thread mathematical conventions live in
+  [`docs/PROJECT-FOUNDATIONS.md`](docs/PROJECT-FOUNDATIONS.md); mathematical
+  work normally starts from `STEERING.md` and the relevant thread ledger.
 - Owners can begin with [`docs/OWNER-GUIDE.md`](docs/OWNER-GUIDE.md).
 - The worked interaction is in
   [`examples/WORKED-SESSION.md`](examples/WORKED-SESSION.md).
@@ -61,7 +62,7 @@ Run the included Python utilities through `uv`.
 |---|---|
 | `AGENTS.md` | Authoritative session contract: boot, authority, evidence, records, and safety |
 | `CLAUDE.md` | Claude entry point forwarding to the authoritative session contract |
-| `docs/PROJECT-FOUNDATIONS.md` | Compact shared mathematical boot state with primary claim pointers |
+| `docs/PROJECT-FOUNDATIONS.md` | Optional shared mathematical conventions and scope guards, with primary claim pointers |
 | `STEERING.md` | Current directions that genuinely apply across research threads |
 | `docs/` | Owner guide and focused workflow policies |
 | `templates/` | Optional starting shapes for new records |

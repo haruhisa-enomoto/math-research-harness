@@ -3,11 +3,11 @@
 Records are separated by function so that exploratory work stays cheap and
 canonical state stays readable.
 
-`PROJECT-FOUNDATIONS.md` is the compact mathematical boot layer shared by all
-threads. It summarizes stable cross-thread facts while citing the primary
-thread claim that owns each exact statement and its evidence. It does not
-replace a thread ledger or claim catalog, and thread ledgers should not copy its
-contents unless a local convention or scope distinction requires repetition.
+`PROJECT-FOUNDATIONS.md` is an optional compact reference for conventions,
+scope and transport guards, and exceptional facts reused across several
+substantively different threads. It is not universal boot state and does not
+replace a thread ledger or claim catalog. A ledger cites it when applicable;
+otherwise the thread keeps its mathematics local.
 
 ## Scratch
 
