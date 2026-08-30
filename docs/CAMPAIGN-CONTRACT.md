@@ -14,18 +14,59 @@ conversation and current ledger. Record:
 - important resource or authority limits; and
 - conditions requiring a return to the owner.
 
+Unless the owner explicitly broadens a particular campaign, a target taken
+from the literature must be formally labelled `Conjecture` by its authors.
+Statements labelled `Question` or `Problem`, informal future-work prompts, and
+conjectural remarks are not eligible merely because they can be read as
+yes-or-no claims. They may still supply background, examples, or proof
+ingredients. This rule governs target selection and does not reclassify
+historical resolutions.
+
+Before allocating a target, check whether the repository has already settled
+it: read the owning thread's compact settled-target index when it has one, then
+search its ledger, claim catalog, and notes by author, title, and distinctive
+statement text. This internal check is separate from the literature audit. A
+target already settled here, or listed in a selection-exclusion registry, is
+ineligible even when no external paper has resolved it.
+
+The local source catalog is a deduplication and availability check, not the
+candidate pool. Target discovery is open to papers the repository does not
+hold, and should use focused public search, current listings, bibliographic
+catalogs, and backward or forward citation trails whenever they have useful
+expected value. Run the forward-citation check in `docs/LITERATURE.md` before
+treating a paper-stated conjecture as apparently open. A paper's absence from
+the local catalog neither disfavors it nor makes it ineligible.
+
 The owner approves the target and scope, not a predetermined route registry.
 
 ## Completion
 
-A campaign resolves only its exact target, by proof at the stated scope or by a
-certified refutation that settles it. The following may be valuable progress
-without being completion:
+A campaign resolves only its exact target, by a proof produced in the campaign
+at the stated scope or by a certified refutation produced in the campaign that
+settles it. An existing literature resolution is a target-selection correction,
+not a campaign resolution: a `proved/literature` finding is never by itself a
+terminal campaign outcome.
+
+If a later literature check shows that the allocated target was already
+settled, record the exact source and scope when useful, add the target to the
+relevant exclusion registry, and release it. When the mandate authorizes target
+selection or pivots, select another eligible target and continue. When it does
+not, return to the owner for a new target and state explicitly that the
+campaign has not succeeded. Literature may still be load-bearing evidence for
+ingredients of a new proof or refutation; what is excluded is treating the
+discovery of an existing exact resolution as the campaign's achievement.
+
+If the campaign independently completes a proof or certified refutation, a
+later matching literature source does not erase that work: preserve the agent
+argument and its provenance separately.
+
+The following may be valuable progress without being completion:
 
 - a narrower positive result;
 - verification through a finite boundary;
 - an equivalent-strength reformulation;
 - a candidate counterexample without a checkable certificate;
+- an exact resolution found only in existing literature;
 - an argument with an unresolved compatibility step; or
 - confidence unsupported by completed evidence.
 

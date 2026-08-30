@@ -37,7 +37,9 @@ without separate approval while recording the same local contract.
 
 A narrower theorem, bounded verification, or equivalent-strength reduction is
 progress rather than completion. Resolve the exact target or return under the
-campaign’s stated handoff conditions.
+campaign’s stated handoff conditions. Finding that the literature already settles
+the target is nonterminal: follow the correction-and-pivot rule in
+`docs/CAMPAIGN-CONTRACT.md` rather than reporting campaign success.
 
 An in-program subcampaign returns its conclusion to the surrounding program,
 which may absorb the result and continue within its approved territory.
