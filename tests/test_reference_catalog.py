@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.reference_catalog import audit, refresh_catalog
+from tools.reference_catalog import audit, refresh_catalog, refresh_catalog_items
 from tools.reference_utils import sha256
 
 
@@ -39,6 +39,38 @@ class ReferenceCatalogTests(unittest.TestCase):
             original.write_bytes(b"changed")
             with self.assertRaises(RuntimeError):
                 audit(root)
+
+    def test_incremental_update_rebuilds_a_malformed_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+            selected = root / "items/papers/selected"
+            other = root / "items/papers/other"
+            for key, item in (("selected", selected), ("other", other)):
+                item.mkdir(parents=True)
+                (item / "item.json").write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 2,
+                            "id": f"paper:{key}",
+                            "kind": "paper",
+                            "key": key,
+                            "item_path": f"items/papers/{key}",
+                            "resources": {},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            root.mkdir(exist_ok=True)
+            (root / "CATALOG.json").write_text("not json", encoding="utf-8")
+
+            result = refresh_catalog_items(root, [selected])
+
+            self.assertEqual(result["catalog_items"], 2)
+            catalog = json.loads((root / "CATALOG.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                [item["id"] for item in catalog["items"]],
+                ["paper:other", "paper:selected"],
+            )
 
 
 if __name__ == "__main__":

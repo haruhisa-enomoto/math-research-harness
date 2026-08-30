@@ -73,7 +73,7 @@ Run the included Python utilities through `uv`.
 | `briefings/` | Optional interface for collaborators without repository access |
 | `references/` | Ignored local source workspace with a tracked usage guide |
 | `.research-scratch/` | Ignored disposable workspace created only when needed |
-| `tools/` | Literature acquisition, preparation and catalog utilities, the claim-catalog audit, and the manuscript vocabulary check |
+| `tools/` | Literature acquisition, preparation, catalog and citation-discovery utilities, the claim-catalog audit, and the manuscript vocabulary check |
 | `tests/` | Offline unit tests for the reusable harness tools |
 
 ## Design principles

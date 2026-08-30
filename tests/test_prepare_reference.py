@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import errno
 import json
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import fitz
 
-from tools.prepare_reference import prepare, relabel_selected_pages
+from tools.extract_pdf_text import extract_pdf
+from tools.prepare_reference import (
+    prepare,
+    relabel_selected_pages,
+    replace_with_cross_device_fallback,
+)
 from tools.reference_utils import parse_pages
 from tools.render_pdf_pages import render_pages
 
@@ -47,6 +54,22 @@ class PrepareReferenceTests(unittest.TestCase):
             self.assertIsNone(metadata["output_ocr_pdf"])
             self.assertEqual(len(metadata["source_sha256"]), 64)
 
+    def test_low_level_extractor_always_writes_default_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw)
+            pdf = temporary / "paper.pdf"
+            text_output = temporary / "paper-text.txt"
+            metadata_output = temporary / "paper-text.metadata.json"
+            self.make_pdf(pdf)
+
+            metadata = extract_pdf(pdf, text_output)
+
+            self.assertTrue(text_output.is_file())
+            self.assertTrue(metadata_output.is_file())
+            self.assertEqual(metadata["metadata_output"], str(metadata_output))
+            persisted = json.loads(metadata_output.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["source_sha256"], metadata["source_sha256"])
+
     def test_page_renderer_writes_selected_png(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_raw:
             temporary = Path(temporary_raw)
@@ -61,6 +84,24 @@ class PrepareReferenceTests(unittest.TestCase):
         relabeled = relabel_selected_pages(text, [7, 11], 20)
         self.assertIn("===== PAGE 7 / 20 =====", relabeled)
         self.assertIn("===== PAGE 11 / 20 =====", relabeled)
+
+    def test_cross_device_replace_falls_back_to_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw)
+            source = temporary / "source.pdf"
+            target = temporary / "derived" / "target.pdf"
+            source.write_bytes(b"reference bytes")
+            target.parent.mkdir()
+
+            with mock.patch.object(
+                Path,
+                "replace",
+                side_effect=OSError(errno.EXDEV, "cross-device link"),
+            ):
+                replace_with_cross_device_fallback(source, target)
+
+            self.assertFalse(source.exists())
+            self.assertEqual(target.read_bytes(), b"reference bytes")
 
     @unittest.skipUnless(
         all(shutil.which(command) for command in ("ocrmypdf", "tesseract")),

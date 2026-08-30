@@ -1082,6 +1082,7 @@ def refresh_items(
     only: str | None = None,
     unpack: bool = False,
     scan_citations: bool = True,
+    update_catalog: bool = True,
 ) -> dict[str, object]:
     """Write or update `item.json` for every catalog item, plus external records."""
     catalog_path = root / "CATALOG.json"
@@ -1164,9 +1165,9 @@ def refresh_items(
             )
 
             kept = manual_fields(previous) if not force else set()
+            previous_identity = previous.get("bibliographic_identity")
+            previous_provenance = previous.get("metadata_provenance")
             if kept:
-                previous_identity = previous.get("bibliographic_identity")
-                previous_provenance = previous.get("metadata_provenance")
                 if isinstance(previous_identity, dict):
                     for name in kept:
                         if name in previous_identity:
@@ -1176,6 +1177,12 @@ def refresh_items(
 
             version = VERSION_SUFFIX.search(key) if singular == "arxiv" else None
             persistent = f"arXiv:{key}" if singular == "arxiv" else (f"doi:{identity.doi}" if identity.doi else None)
+            exact_version = version.group(0) if version else None
+            if isinstance(previous_identity, dict):
+                if "persistent_identifier" in kept:
+                    persistent = previous_identity.get("persistent_identifier")
+                if "exact_version" in kept:
+                    exact_version = previous_identity.get("exact_version")
             aliases = sorted(set(legacy_entries))
             derivatives = sorted(set(derived_by_item.get(item_id, [])))
             citations = sorted(item_citations.get(item_id, []))
@@ -1201,7 +1208,7 @@ def refresh_items(
                     "item_path": item_path.relative_to(root).as_posix(),
                     "bibliographic_identity": identity.to_json(
                         persistent_identifier=persistent,
-                        exact_version=version.group(0) if version else None,
+                        exact_version=exact_version,
                     ),
                     "metadata_provenance": dict(sorted(identity.provenance.items())),
                     "aliases": aliases,
@@ -1230,8 +1237,10 @@ def refresh_items(
             root, external_payloads, slug_citations, timestamp, force=force
         )
 
-    catalog_result = refresh_catalog(root)
-    catalog_result["index"] = write_index(root)
+    catalog_result: dict[str, object] | None = None
+    if update_catalog:
+        catalog_result = refresh_catalog(root)
+        catalog_result["index"] = write_index(root)
     return {
         "items_written": written,
         "external_records": external_written,
@@ -1283,10 +1292,21 @@ def write_external_records(
                 previous = {}
         kept = manual_fields(previous) if not force else set()
         previous_identity = previous.get("bibliographic_identity")
+        previous_provenance = previous.get("metadata_provenance")
         if kept and isinstance(previous_identity, dict):
             for name in kept:
                 if name in previous_identity:
                     setattr(identity, name, previous_identity[name])
+                    if isinstance(previous_provenance, dict):
+                        identity.provenance[name] = str(previous_provenance[name])
+
+        persistent = f"doi:{identity.doi}" if identity.doi else None
+        exact_version = None
+        if isinstance(previous_identity, dict):
+            if "persistent_identifier" in kept:
+                persistent = previous_identity.get("persistent_identifier")
+            if "exact_version" in kept:
+                exact_version = previous_identity.get("exact_version")
 
         citations = sorted(slug_citations.get(slug, []))
         record = dict(previous)
@@ -1300,8 +1320,8 @@ def write_external_records(
                 "original_path": source,
                 "source_sha256": payload.get("source_sha256"),
                 "bibliographic_identity": identity.to_json(
-                    persistent_identifier=f"doi:{identity.doi}" if identity.doi else None,
-                    exact_version=None,
+                    persistent_identifier=persistent,
+                    exact_version=exact_version,
                 ),
                 "metadata_provenance": dict(sorted(identity.provenance.items())),
                 "aliases": [],

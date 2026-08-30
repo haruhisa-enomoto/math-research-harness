@@ -16,10 +16,10 @@ from typing import Callable
 from urllib.parse import urlparse
 
 try:
-    from tools.reference_catalog import audit, refresh_catalog
+    from tools.reference_catalog import audit_items, refresh_catalog_items
     from tools.reference_utils import sha256, write_json_atomic
 except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
-    from reference_catalog import audit, refresh_catalog
+    from reference_catalog import audit_items, refresh_catalog_items
     from reference_utils import sha256, write_json_atomic
 
 
@@ -33,7 +33,13 @@ def describe_item(root: Path, item_id: str) -> None:
         from tools.reference_metadata import refresh_items
     except ModuleNotFoundError:
         from reference_metadata import refresh_items
-    refresh_items(root, Path(__file__).resolve().parents[1], only=item_id, scan_citations=False)
+    refresh_items(
+        root,
+        Path(__file__).resolve().parents[1],
+        only=item_id,
+        scan_citations=False,
+        update_catalog=False,
+    )
 
 
 MODERN_ID = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?", re.IGNORECASE)
@@ -261,6 +267,7 @@ def fetch(
     previous_resources = previous.get("resources", {})
     resources = dict(previous_resources) if isinstance(previous_resources, dict) else {}
     extracted = list(previous.get("extracted_source_files", []))
+    downloaded_this_run = False
     download = downloader or (
         lambda url, destination, headers: curl_download(
             url, destination, headers, user_agent=user_agent
@@ -299,7 +306,11 @@ def fetch(
                     **(cached if isinstance(cached, dict) else {}),
                     "status": "cached",
                     "path": final_path(stored_source),
-                    "sha256": sha256(stored_source),
+                    "sha256": (
+                        cached.get("sha256")
+                        if isinstance(cached, dict) and isinstance(cached.get("sha256"), str)
+                        else sha256(stored_source)
+                    ),
                     "bytes": stored_source.stat().st_size,
                 }
             else:
@@ -316,6 +327,7 @@ def fetch(
                     "bytes": stored_source.stat().st_size,
                     **network,
                 }
+                downloaded_this_run = True
 
         if want_pdf:
             stored_pdf = original / "paper.pdf"
@@ -325,7 +337,11 @@ def fetch(
                     **(cached if isinstance(cached, dict) else {}),
                     "status": "cached",
                     "path": final_path(stored_pdf),
-                    "sha256": sha256(stored_pdf),
+                    "sha256": (
+                        cached.get("sha256")
+                        if isinstance(cached, dict) and isinstance(cached.get("sha256"), str)
+                        else sha256(stored_pdf)
+                    ),
                     "bytes": stored_pdf.stat().st_size,
                 }
             else:
@@ -343,12 +359,9 @@ def fetch(
                     "bytes": stored_pdf.stat().st_size,
                     **network,
                 }
+                downloaded_this_run = True
 
         checked_at = datetime.now().astimezone().isoformat(timespec="seconds")
-        downloaded = any(
-            isinstance(resource, dict) and resource.get("status") == "downloaded"
-            for resource in resources.values()
-        )
         # Bibliographic enrichment written by tools/reference_metadata.py survives
         # a re-file; only download provenance is rewritten here.
         carried = {
@@ -374,7 +387,7 @@ def fetch(
             "arxiv_id": arxiv_id,
             "versioned": bool(VERSION.search(arxiv_id)),
             "downloaded_at": (
-                checked_at if downloaded else previous.get("downloaded_at", checked_at)
+                checked_at if downloaded_this_run else previous.get("downloaded_at", checked_at)
             ),
             "checked_at": checked_at,
             "item_path": item.relative_to(root).as_posix(),
@@ -397,13 +410,14 @@ def fetch(
 
     # Describe the committed item even inside a batch, so a fetched source is
     # searchable by author and title without a separate full metadata run.
-    describe_item(root, f"arxiv:{key}")
+    if downloaded_this_run or not isinstance(previous.get("bibliographic_identity"), dict):
+        describe_item(root, f"arxiv:{key}")
 
     catalog_result: dict[str, object] | None = None
     audit_result: dict[str, object] | None = None
     if update_catalog:
-        catalog_result = refresh_catalog(root)
-        audit_result = audit(root)
+        catalog_result = refresh_catalog_items(root, [item])
+        audit_result = audit_items(root, [item])
 
     return {
         "arxiv_id": arxiv_id,
@@ -429,7 +443,7 @@ def fetch_many(
     user_agent: str = DEFAULT_USER_AGENT,
     invocation: list[str] | None = None,
 ) -> dict[str, object]:
-    """Fetch known arXiv items sequentially, then refresh and audit once."""
+    """Fetch known arXiv items sequentially, then catalog the completed items."""
     if not values:
         raise ValueError("at least one arXiv identifier is required")
 
@@ -437,6 +451,7 @@ def fetch_many(
     normalized = [normalize_arxiv_id(value) for value in values]
     root = root.resolve()
     results: list[dict[str, object]] = []
+    catalog_result: dict[str, object] | None = None
     try:
         for arxiv_id in normalized:
             results.append(
@@ -455,9 +470,11 @@ def fetch_many(
             )
     finally:
         # Keep successfully completed earlier items discoverable if a later fetch fails.
-        catalog_result = refresh_catalog(root)
+        completed_items = [root / str(result["item"]) for result in results]
+        if completed_items:
+            catalog_result = refresh_catalog_items(root, completed_items)
 
-    audit_result = audit(root)
+    audit_result = audit_items(root, completed_items)
     return {
         "items": results,
         "catalog": catalog_result,

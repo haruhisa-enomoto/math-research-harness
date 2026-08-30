@@ -6,7 +6,9 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tools import reference_catalog
 from tools.fetch_arxiv import (
     fetch,
     fetch_many,
@@ -60,7 +62,15 @@ class FetchArxivTests(unittest.TestCase):
             self.assertTrue((item / "original/paper.pdf").is_file())
             self.assertTrue((item / "source/paper/main.tex").is_file())
             self.assertEqual(result["main_tex_candidates"], ["paper/main.tex"])
-            self.assertEqual(result["audit"], {"status": "ok", "items": 1})
+            self.assertEqual(
+                result["audit"],
+                {
+                    "status": "ok",
+                    "items": 1,
+                    "scope": "selected",
+                    "hashes_checked": False,
+                },
+            )
 
             metadata = json.loads((item / "item.json").read_text(encoding="utf-8"))
             self.assertTrue(metadata["versioned"])
@@ -130,9 +140,74 @@ class FetchArxivTests(unittest.TestCase):
                     "path": "CATALOG.json",
                 },
             )
-            self.assertEqual(result["audit"], {"status": "ok", "items": 2})
+            self.assertEqual(
+                result["audit"],
+                {
+                    "status": "ok",
+                    "items": 2,
+                    "scope": "selected",
+                    "hashes_checked": False,
+                },
+            )
             self.assertTrue((root / "items/arxiv/2099.00001v1/item.json").is_file())
             self.assertTrue((root / "items/arxiv/2099.00002v3/item.json").is_file())
+
+    def test_existing_catalog_update_does_not_scan_or_hash_unrelated_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+
+            def downloader(url: str, destination: Path, headers: Path) -> dict[str, object]:
+                headers.write_text("HTTP/2 200\n")
+                if "/e-print/" in url:
+                    destination.write_bytes(b"\\documentclass{article}\n")
+                else:
+                    destination.write_bytes(b"%PDF-1.4\n%%EOF\n")
+                return {}
+
+            fetch("2099.00001v1", root=root, downloader=downloader)
+            damaged = root / "items/arxiv/2099.00001v1/original/source.tex"
+            damaged.write_bytes(b"changed after its recorded hash")
+
+            with patch(
+                "tools.reference_catalog.regular_files",
+                wraps=reference_catalog.regular_files,
+            ) as scans:
+                result = fetch("2099.00002v1", root=root, downloader=downloader)
+
+            scanned_paths = [str(call.args[0]) for call in scans.call_args_list]
+            self.assertTrue(any("2099.00002v1" in path for path in scanned_paths))
+            self.assertFalse(any("2099.00001v1" in path for path in scanned_paths))
+            self.assertEqual(result["catalog"]["catalog_items"], 2)
+
+            # The explicit full audit still detects unrelated stored-file damage.
+            with self.assertRaisesRegex(RuntimeError, "hash mismatch"):
+                reference_catalog.audit(root)
+
+    def test_cached_fetch_reuses_recorded_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            root = Path(temporary_raw) / "references"
+
+            def downloader(_url: str, destination: Path, headers: Path) -> dict[str, object]:
+                headers.write_text("HTTP/2 200\n")
+                destination.write_bytes(b"\\documentclass{article}\n")
+                return {}
+
+            fetch(
+                "2099.00001v1",
+                root=root,
+                want_pdf=False,
+                downloader=downloader,
+            )
+            with patch("tools.fetch_arxiv.sha256") as hash_file:
+                result = fetch(
+                    "2099.00001v1",
+                    root=root,
+                    want_pdf=False,
+                    downloader=downloader,
+                )
+
+            hash_file.assert_not_called()
+            self.assertEqual(result["resources"]["source"]["status"], "cached")
 
     def test_fetch_many_validates_entire_batch_before_downloading(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_raw:

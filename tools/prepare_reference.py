@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,7 +38,14 @@ except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
 
 def run(command: list[str], commands: list[list[str]], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
     commands.append(command)
-    return subprocess.run(command, check=True, capture_output=capture, text=True)
+    return subprocess.run(
+        command,
+        check=True,
+        capture_output=capture,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
 
 def pdf_page_count(path: Path) -> int:
@@ -77,6 +86,17 @@ def image_document_to_pdf(input_path: Path, output_path: Path) -> None:
         payload = image_document.convert_to_pdf()
     with fitz.open("pdf", payload) as pdf_document:
         pdf_document.save(output_path)
+
+
+def replace_with_cross_device_fallback(source: Path, target: Path) -> None:
+    """Replace target with source even when their filesystems differ."""
+    try:
+        source.replace(target)
+    except OSError as error:
+        if error.errno != errno.EXDEV:
+            raise
+        shutil.copy2(source, target)
+        source.unlink()
 
 
 def relabel_selected_pages(text: str, source_pages: list[int], source_total: int) -> str:
@@ -192,7 +212,7 @@ def prepare(
             command.extend([str(ocr_input), str(temporary_ocr)])
             run(command, commands)
             ocr_output.parent.mkdir(parents=True, exist_ok=True)
-            temporary_ocr.replace(ocr_output)
+            replace_with_cross_device_fallback(temporary_ocr, ocr_output)
 
             extract_pdf(
                 ocr_output,

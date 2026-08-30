@@ -13,9 +13,11 @@ Check the existing local catalog first, with `tools/reference_lookup.py`
 (section 5). It records author, title, year, identifiers, keywords, and
 abstract for every local item, so a source can be found by what it is rather
 than by a remembered identifier or slug. Then use focused public discovery,
-following citations backward or forward when that is useful. Prefer primary
-sources for mathematical claims and control the exact version when revisions or
-publication differences may matter.
+following citations backward or forward when that is useful. Before treating a
+paper-stated conjecture as apparently open, or accepting an agent argument as a
+new full-scope resolution, run the forward-citation check in section 5 against
+the source paper. Prefer primary sources for mathematical claims and control
+the exact version when revisions or publication differences may matter.
 
 Prefer arXiv TeX when it is available: it usually preserves definitions,
 formulas, and structure more reliably than PDF text extraction and provides
@@ -86,7 +88,9 @@ The helper accepts modern or old-style identifiers and official `abs`, `pdf`,
 or `e-print` URLs. It does not search or query the metadata API. It validates a
 multi-item request before downloading, processes the items sequentially, safely
 unpacks tar or gzip source material, identifies likely main TeX files, records
-hashes and response metadata, then refreshes and audits the local catalog once.
+hashes and response metadata, then incrementally updates and validates the
+selected catalog entries. It does not rescan or re-hash unrelated items. If the
+catalog is missing or malformed, it falls back to a full rebuild.
 
 Prefer a versioned identifier. An unversioned identifier is allowed, but the
 metadata warns that only the downloaded hashes pin the local bytes. Existing
@@ -164,7 +168,7 @@ diagrams against the source image.
 
 ## 5. Search and maintain the catalog
 
-### Search
+### Local search
 
 `CATALOG.json` carries title, authors, year, identifiers, keywords, and
 abstract for every local item, plus records for externally held sources present
@@ -187,12 +191,66 @@ derivative. `references/CATALOG.md` is the same information as an
 author-sorted reading list.
 
 This is a catalog or targeted-path lookup, not a recursive scan of the
-reference workspace or of an external library.
+reference workspace or of an external library. It says what is available here;
+it does not discover later papers that cite a source.
 
 Catalog identity is extracted from local material, not from a metadata service.
 It is an availability index and a search aid: confirm bibliographic identity in
 the source itself before a `proved/literature` claim, and check the recorded
 provenance (`tools/reference_lookup.py -v`) when a field looks doubtful.
+
+### Forward-citation discovery
+
+A local catalog cannot tell you who has cited a source since it was filed.
+Before allocating a paper-stated conjecture as a research target, or accepting
+an agent argument as a new full-scope resolution, query the source paper's
+forward citations:
+
+```bash
+uv run python tools/reference_citations.py arxiv:2099.01234v2
+uv run python tools/reference_citations.py doi:10.1000/example.2099.001
+uv run python tools/reference_citations.py "Finiteness properties of rings of invariants"
+```
+
+The helper accepts an arXiv identifier or official URL, a DOI or DOI URL, or an
+exact title. It first enriches the query from `CATALOG.json`, then queries
+Semantic Scholar and OpenAlex sequentially, exhausts their pagination,
+normalizes the returned metadata, and deduplicates citing works by arXiv ID,
+DOI, and bibliographic identity. Semantic Scholar runs first because it accepts
+arXiv identifiers directly; metadata it resolves can then make the OpenAlex
+lookup more reliable.
+
+Use `--json` for machine-readable output. `--provider semantic-scholar` or
+`--provider openalex` deliberately restricts the audit. `--max-results N` is an
+explicitly bounded diagnostic: it labels the affected provider truncated and
+exits nonzero. A provider lookup, resolution, or pagination failure also
+preserves any results obtained from the other provider but exits nonzero, so
+partial coverage cannot silently pass as a completed check.
+
+The helper reads a Semantic Scholar key, when available, from
+`SEMANTIC_SCHOLAR_API_KEY`, and an OpenAlex key from `OPENALEX_API_KEY`.
+Provide the free OpenAlex key rather than assuming anonymous service will
+remain available. Do not put keys in command arguments or repository files. The
+ordinary `RESEARCH_HARNESS_USER_AGENT` setting also applies.
+
+Citation-graph coverage is uneven. A provider reporting zero citations is not
+evidence that there are none, and the helper's `complete` field means only that
+every enabled provider resolved and paginated successfully. It does not mean
+that their combined scholarly graph is universally complete. Treat an
+independent "cited by" inspection, where one is available, as a useful
+additional safety check rather than as something the helper has reproduced.
+
+The returned records are discovery leads, not checked citations. For each
+plausible settlement or follow-up, identify the exact version, fetch its arXiv
+source when available, and compare the theorem, hypotheses, conventions, and
+scope as required in section 6. If a research run is long enough that the
+citation graph may have changed materially, repeat the check before claiming a
+new resolution.
+
+Provider documentation:
+
+- [Semantic Scholar Academic Graph API](https://www.semanticscholar.org/product/api)
+- [OpenAlex Works API](https://developers.openalex.org/api-reference/works)
 
 ### Maintain
 
