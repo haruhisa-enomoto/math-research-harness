@@ -360,6 +360,42 @@ the exposition needs a broader rewrite.
 For the full relay protocol, see
 [`FIRST-READER-REVIEW.md`](FIRST-READER-REVIEW.md).
 
+## Manuscript vocabulary check
+
+Before freezing a prose revision for independent regression, run the repository
+vocabulary checker on every active manuscript TeX source as specified in
+[`../paper/vocab/README.md`](../paper/vocab/README.md). Rebuild the lexicon
+first when eligible source TeX under `references/` has been added or changed.
+The normal check writes `vocabulary-report.json` and `vocabulary-report.md`
+beside manuscript TeX files that share a directory; choose the manuscript root
+explicitly with `--report-dir` when active sources span directories.
+`--stdout-only` is exploratory and does not satisfy the recorded check.
+
+A vocabulary report locates passages for exposition review. It is not a list of
+forbidden strings and does not pass or fail a manuscript. Inspect every flag at
+its manuscript location. Before changing a spelling, decide whether the phrase
+is an undefined or unnecessary label, an ambiguous English substitute for an
+exact mathematical predicate, an apparent theorem name, a citation standing in
+for the result used, or private-process language, and repair the mathematical
+statement or its role when needed.
+
+Consider spelling or hyphenation only after the phrase itself is precise,
+necessary, and properly introduced. Never change a token merely to remove a
+flag. For every justified hyphenated form, inspect the exact hyphenated, open,
+and solid comparison. Raw occurrence counts and general-English hyphenation
+rules do not establish mathematical usage; use the author-signature and
+distinct-paper breadth together with the mathematical context. A correct
+specialized term may remain flagged, and sparse or mixed evidence may support
+retaining it.
+
+The gate is complete when the checker has run on every active TeX source at the
+exact revision and every flag has been inspected and adjudicated, not when the
+report has no warnings. Cluster recurring semantic causes in the ordinary
+revision batch rather than making one mechanical edit per token, and rerun
+after any accepted wording repair. A later prose edit invalidates the recorded
+check. Do not give vocabulary reports or their adjudication to an isolated
+reader, or count this writer-side diagnostic as independent reading evidence.
+
 ## Revision check
 
 Before declaring a manuscript revision complete, check at least the following.
