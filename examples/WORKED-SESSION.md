@@ -107,13 +107,13 @@ Owner:
 
 > Put this in the paper.
 
-Only then does the agent edit `paper/`. It works to `docs/PAPER-WRITING.md`:
-every term defined before use, every cited result stated with the content
-actually used, computational claims carrying their exact scope, and no trace of
-the conversation, review history, or instructions in the manuscript text. When
-the mathematics has settled, a forward-blind reading follows
-`docs/FIRST-READER-REVIEW.md`, using the templates in
-`templates/first-reader/`.
+Only then does the agent edit `paper/`. It works through
+`write-research-paper` and this repository's `docs/PAPER-WRITING.md`: every
+term defined before use, every cited result stated with the content actually
+used, computational claims carrying their exact scope, and no trace of the
+conversation, review history, or instructions in the manuscript text. When the
+mathematics has settled, an isolated reader runs `read-research-paper` under a
+frozen direction, set up as `docs/FIRST-READER-REVIEW.md` describes.
 
 ## 9. When collaboration helps
 

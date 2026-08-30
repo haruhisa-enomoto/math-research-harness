@@ -23,10 +23,21 @@ Read this file first and classify the task.
   `docs/COLLABORATION.md`.
 - Read `docs/CAMPAIGN-CONTRACT.md` before an exact full-resolution campaign.
 - Read `docs/REPORTS.md` before producing a substantial owner-facing report.
-- Read `docs/PAPER-WRITING.md` before drafting or revising a live research-paper
-  manuscript.
-- Read `docs/FIRST-READER-REVIEW.md` before running or supervising a
-  first-reader review of a manuscript.
+- Before drafting or revising a live research-paper manuscript, use
+  `write-research-paper` and read `docs/PAPER-WRITING.md` for this repository's
+  local overlay.
+- Before supervising a first-reader review, read
+  `docs/FIRST-READER-REVIEW.md`; the isolated reader loads the portable
+  protocol through `read-research-paper`.
+- Before supervising a skeptical-editor review, read
+  `docs/SKEPTICAL-EDITOR-REVIEW.md`; the isolated editor loads the portable
+  protocol through `read-research-paper`.
+
+The portable `write-research-paper` and `read-research-paper` skills are
+maintained outside this repository and installed through user-level skill
+links; see `docs/SKILLS.md`. This repository keeps only its local overlays and
+vocabulary tooling. A skill supplements this contract and never creates edit
+authority. Other repository record shapes are in `templates/`.
 
 ## Authority and scope
 

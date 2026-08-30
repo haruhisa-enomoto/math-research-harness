@@ -44,9 +44,10 @@ not carry that meaning.
 
 The agent may edit and compile the live paper. Recording progress, preparing a
 research note, or writing a standalone report does not independently authorize
-paper editing. Once authorized, the agent works to the exposition standards in
-[`PAPER-WRITING.md`](PAPER-WRITING.md), together with any style memo in the
-paper's thread.
+paper editing. Once authorized, the agent works to the portable exposition standard carried
+by the paper-writing skill (see [`SKILLS.md`](SKILLS.md)), together with this
+repository's conventions in [`PAPER-WRITING.md`](PAPER-WRITING.md) and any
+style memo in the paper's thread.
 
 ## What the records mean
 

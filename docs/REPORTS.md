@@ -8,8 +8,9 @@ authorized mathematical scope nor the return conditions in
 `docs/RESEARCH-MODES.md`.
 
 This guide does not govern revision of a live research-paper manuscript. For
-that work, read [`PAPER-WRITING.md`](PAPER-WRITING.md); when a task involves
-both a live paper and a separate owner-facing report, use both guides.
+that work, use `write-research-paper` and read
+[`PAPER-WRITING.md`](PAPER-WRITING.md); when a task involves both a live paper
+and a separate owner-facing report, use both.
 
 ## Scope and audience
 

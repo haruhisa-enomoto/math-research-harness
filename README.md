@@ -19,10 +19,12 @@ and `setting S`.
   [`docs/LITERATURE.md`](docs/LITERATURE.md).
 - Computational reproducibility is described in
   [`docs/COMPUTATIONS.md`](docs/COMPUTATIONS.md).
-- Manuscript exposition standards are in
-  [`docs/PAPER-WRITING.md`](docs/PAPER-WRITING.md), and the forward-blind
-  reading protocol is in
-  [`docs/FIRST-READER-REVIEW.md`](docs/FIRST-READER-REVIEW.md).
+- Manuscript writing and independent exposition review run through the
+  portable skills recorded in [`docs/SKILLS.md`](docs/SKILLS.md); this
+  repository keeps only the local overlays in
+  [`docs/PAPER-WRITING.md`](docs/PAPER-WRITING.md),
+  [`docs/FIRST-READER-REVIEW.md`](docs/FIRST-READER-REVIEW.md), and
+  [`docs/SKEPTICAL-EDITOR-REVIEW.md`](docs/SKEPTICAL-EDITOR-REVIEW.md).
 - The fictional canonical state begins at
   [`threads/INDEX.md`](threads/INDEX.md).
 
