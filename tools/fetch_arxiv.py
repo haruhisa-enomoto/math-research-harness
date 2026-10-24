@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Callable
@@ -173,11 +174,49 @@ def safe_extract(archive: tarfile.TarFile, destination: Path) -> list[str]:
     return sorted(extracted)
 
 
+def safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> list[str]:
+    """Extract a zip archive under the same path and size limits as a tarball."""
+    members = archive.infolist()
+    if len(members) > MAX_ARCHIVE_MEMBERS:
+        raise RuntimeError("source archive contains too many entries")
+    if sum(member.file_size for member in members) > MAX_ARCHIVE_BYTES:
+        raise RuntimeError("source archive declares too much uncompressed data")
+
+    destination.mkdir(parents=True, exist_ok=True)
+    destination_resolved = destination.resolve()
+    extracted: list[str] = []
+    seen: set[Path] = set()
+    for member in members:
+        path = PurePosixPath(member.filename)
+        if path.is_absolute() or ".." in path.parts or "\\" in member.filename:
+            raise RuntimeError(f"unsafe path in source archive: {member.filename!r}")
+        # The high bits of external_attr carry the Unix mode; reject symlinks.
+        if (member.external_attr >> 16) & 0o170000 == 0o120000:
+            raise RuntimeError(f"unsupported special entry in source archive: {member.filename!r}")
+        target = destination.joinpath(*path.parts).resolve()
+        if not target.is_relative_to(destination_resolved):
+            raise RuntimeError(f"unsafe extraction target: {member.filename!r}")
+        if target in seen and not member.is_dir():
+            raise RuntimeError(f"duplicate file in source archive: {member.filename!r}")
+        seen.add(target)
+
+        if member.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(member) as source, target.open("wb") as output:
+            shutil.copyfileobj(source, output)
+        extracted.append(target.relative_to(destination).as_posix())
+    return sorted(extracted)
+
+
 def identify_source(path: Path) -> str:
     with path.open("rb") as handle:
         prefix = handle.read(8)
     if prefix.startswith(b"%PDF-"):
         return "pdf"
+    if prefix.startswith(b"PK\x03\x04") and zipfile.is_zipfile(path):
+        return "zip"
     try:
         with tarfile.open(path, "r:*") as archive:
             archive.getmembers()
@@ -195,6 +234,7 @@ def install_source(download: Path, original: Path, source: Path) -> tuple[Path, 
         "pdf": "source.pdf",
         "tar-gzip": "source.tar.gz",
         "tar": "source.tar",
+        "zip": "source.zip",
         "gzip": "source.tex.gz",
         "tex": "source.tex",
     }[kind]
@@ -205,6 +245,9 @@ def install_source(download: Path, original: Path, source: Path) -> tuple[Path, 
     if kind.startswith("tar"):
         with tarfile.open(download, "r:*") as archive:
             extracted = safe_extract(archive, source)
+    elif kind == "zip":
+        with zipfile.ZipFile(download) as archive:
+            extracted = safe_extract_zip(archive, source)
     elif kind == "gzip":
         source.mkdir(parents=True, exist_ok=True)
         target = source / "arxiv-source.tex"

@@ -130,6 +130,7 @@ def prepare(
     source_kind = "pdf" if suffix == ".pdf" else "djvu"
     output_slug = slugify(slug or input_path.stem)
     commands: list[list[str]] = []
+    preprocessing: list[dict[str, str]] = []
     if source_kind == "pdf":
         total_pages = pdf_page_count(input_path)
     else:
@@ -195,6 +196,22 @@ def prepare(
                 ocr_input = rendered_pdf
                 ocr_pages_spec = None
                 djvu_rendered = True
+            else:
+                with fitz.open(input_path) as document:
+                    if document.needs_pass:
+                        raise RuntimeError("OCR input requires a password to open")
+                    if document.metadata.get("encryption"):
+                        # OCRmyPDF rejects even PDFs readable with an empty
+                        # password. Prepare a temporary unencrypted copy while
+                        # keeping the original as the provenance source.
+                        ocr_input = temporary / "unencrypted.pdf"
+                        document.save(ocr_input, encryption=fitz.PDF_ENCRYPT_NONE)
+                        preprocessing.append({
+                            "operation": "remove-empty-password-encryption",
+                            "tool": "PyMuPDF",
+                            "input": str(input_path),
+                            "output": str(ocr_input),
+                        })
 
             temporary_ocr = temporary / "output.ocr.pdf"
             command = [
@@ -203,7 +220,7 @@ def prepare(
                 "pdf",
                 "--rotate-pages",
                 "--deskew",
-                "--skip-text",
+                "--force-ocr" if mode == "ocr" else "--skip-text",
                 "--language",
                 language,
             ]
@@ -250,6 +267,7 @@ def prepare(
             "pymupdf": fitz.VersionBind,
         },
         "commands": commands,
+        "preprocessing": preprocessing,
         "invocation": invocation or ["tools/prepare_reference.py", str(input_path)],
     }
     write_json_atomic(metadata_output, metadata)

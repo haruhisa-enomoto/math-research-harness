@@ -3,8 +3,10 @@
 Status: active | dormant | parked | closed
 Active mode: bounded task | directed investigation | full-resolution campaign | theory-development program | none
 Last updated: <OS-derived timestamp> by <agent>
-Claim catalog: inline | CLAIMS.md
+Claim catalog: CLAIMS.md | none (<reason this thread holds no durable claims>)
 Active state: none | ACTIVE.md
+Question catalog: none | QUESTIONS.md (ordinary list; no mode implied)
+Research question list: none | RESEARCH-QUESTIONS.md (question-driven program)
 
 ## Owner direction
 
@@ -20,7 +22,8 @@ Established boundary, organizing mechanism, and central obstruction.
 
 ## Durable claims
 
-An inline table or a short pointer to `CLAIMS.md`.
+A short pointer to `CLAIMS.md`, plus any framing a reader needs before
+consulting it.
 
 ## Current opportunities
 

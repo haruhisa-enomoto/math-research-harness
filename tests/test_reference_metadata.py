@@ -74,6 +74,25 @@ class ReferenceMetadataTests(unittest.TestCase):
     def item(self) -> dict[str, object]:
         return json.loads(self.metadata_path.read_text(encoding="utf-8"))
 
+    def add_external_derivative(self) -> Path:
+        text_root = self.root / "derived/text"
+        text_root.mkdir(parents=True)
+        (text_root / "noether-ideals.txt").write_text(
+            "===== PAGE 1 / 1 =====\nIdealtheorie in Ringbereichen\nEMMY NOETHER\n",
+            encoding="utf-8",
+        )
+        (text_root / "noether-ideals.metadata.json").write_text(
+            json.dumps(
+                {
+                    "source_pdf": "/external/library/noether/ideals.pdf",
+                    "output_text": "references/derived/text/noether-ideals.txt",
+                    "page_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return self.root / "external/noether-ideals.json"
+
     def test_extracts_identity_from_tex_and_stays_auditable(self) -> None:
         result = self.describe()
         self.assertEqual(result["items_written"], 1)
@@ -95,17 +114,54 @@ class ReferenceMetadataTests(unittest.TestCase):
         self.describe()
         payload = self.item()
         payload["bibliographic_identity"]["title"] = "Published title"
+        payload["bibliographic_identity"]["persistent_identifier"] = "https://example.test/published"
+        payload["bibliographic_identity"]["exact_version"] = "published version"
         payload["metadata_provenance"]["title"] = "manual: checked against the journal version"
+        payload["metadata_provenance"]["persistent_identifier"] = "manual: publisher landing page"
+        payload["metadata_provenance"]["exact_version"] = "manual: checked against the journal version"
         self.metadata_path.write_text(json.dumps(payload), encoding="utf-8")
 
         self.describe()
-        self.assertEqual(self.item()["bibliographic_identity"]["title"], "Published title")
+        identity = self.item()["bibliographic_identity"]
+        self.assertEqual(identity["title"], "Published title")
+        self.assertEqual(identity["persistent_identifier"], "https://example.test/published")
+        self.assertEqual(identity["exact_version"], "published version")
 
         self.describe(force=True)
-        self.assertEqual(
-            self.item()["bibliographic_identity"]["title"],
-            "Finiteness Properties of Rings of Invariants",
-        )
+        identity = self.item()["bibliographic_identity"]
+        self.assertEqual(identity["title"], "Finiteness Properties of Rings of Invariants")
+        self.assertEqual(identity["persistent_identifier"], "arXiv:1503.01234v2")
+        self.assertEqual(identity["exact_version"], "v2")
+
+    def test_external_manual_fields_and_provenance_survive_repeated_refreshes(self) -> None:
+        external_path = self.add_external_derivative()
+        self.describe()
+        payload = json.loads(external_path.read_text(encoding="utf-8"))
+        payload["bibliographic_identity"]["title"] = "Idealtheorie in Ringbereichen"
+        payload["bibliographic_identity"]["authors"] = ["Emmy Noether"]
+        payload["bibliographic_identity"]["year"] = 1921
+        payload["bibliographic_identity"]["persistent_identifier"] = "https://example.test/noether-ideals"
+        payload["bibliographic_identity"]["exact_version"] = "journal version, 1921"
+        payload["metadata_provenance"]["title"] = "manual: published title page"
+        payload["metadata_provenance"]["authors"] = "manual: published title page"
+        payload["metadata_provenance"]["year"] = "manual: published title page"
+        payload["metadata_provenance"]["persistent_identifier"] = "manual: publisher landing page"
+        payload["metadata_provenance"]["exact_version"] = "manual: journal title page"
+        external_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        self.describe()
+        self.describe()
+        refreshed = json.loads(external_path.read_text(encoding="utf-8"))
+        identity = refreshed["bibliographic_identity"]
+        provenance = refreshed["metadata_provenance"]
+        self.assertEqual(identity["title"], "Idealtheorie in Ringbereichen")
+        self.assertEqual(identity["authors"], ["Emmy Noether"])
+        self.assertEqual(identity["year"], 1921)
+        self.assertEqual(identity["persistent_identifier"], "https://example.test/noether-ideals")
+        self.assertEqual(identity["exact_version"], "journal version, 1921")
+        self.assertEqual(provenance["title"], "manual: published title page")
+        self.assertEqual(provenance["authors"], "manual: published title page")
+        self.assertEqual(provenance["year"], "manual: published title page")
 
     def test_lookup_matches_by_author_title_and_year(self) -> None:
         self.describe()

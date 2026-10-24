@@ -12,7 +12,7 @@ except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
     from reference_utils import sha256, write_json_atomic
 
 
-KINDS = {"arxiv": "arxiv", "papers": "paper", "books": "book"}
+KINDS = {"arxiv": "arxiv", "papers": "paper", "books": "book", "hexagon": "hexagon"}
 
 # Bibliographic fields written by tools/reference_metadata.py into each
 # item.json and mirrored into the catalog so a search never opens 300 files.
@@ -25,6 +25,8 @@ CARRIED_FIELDS = (
     "citation_count",
     "search_text",
     "metadata_refreshed_at",
+    # Hexagon authorship and provenance declarations (tools/fetch_hexagon.py).
+    "hexagon",
 )
 
 

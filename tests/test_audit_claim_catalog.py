@@ -88,3 +88,20 @@ def test_rejects_superseded_registry_entries(tmp_path: Path) -> None:
     diagnostics = audit_catalog(path)
 
     assert any("not the live catalog" in item.message for item in diagnostics)
+
+
+def test_accepts_declared_empty_catalog(tmp_path: Path) -> None:
+    path = tmp_path / "CLAIMS.md"
+    path.write_text("# Durable claims: example\n\nNo durable claims yet.\n")
+
+    assert audit_catalog(path) == []
+
+
+def test_rejects_undeclared_empty_catalog(tmp_path: Path) -> None:
+    path = tmp_path / "CLAIMS.md"
+    path.write_text("# Durable claims: example\n")
+
+    diagnostics = audit_catalog(path)
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0].level == "error"

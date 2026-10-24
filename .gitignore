@@ -1,4 +1,7 @@
 .research-scratch/
+
+# Local API keys for the citation helper.
+.env
 __pycache__/
 *.pyc
 *~

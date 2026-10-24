@@ -11,6 +11,10 @@ census, witness, verification narrative, and route history in the linked note
 or result.
 -->
 
+No durable claims yet.
+
+<!-- Keep the line above until the first entry exists, then delete it. -->
+
 ### 1. <Short title>
 
 Status: <evidence status>

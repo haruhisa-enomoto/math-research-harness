@@ -124,6 +124,16 @@ def format_record(record: dict[str, object], *, verbose: bool) -> str:
     lines = [f"{shown or '(unattributed)'}{f' ({year})' if year else ''}. {title}"]
 
     tags = []
+    hexagon = record.get("hexagon") if isinstance(record.get("hexagon"), dict) else None
+    if record.get("kind") == "hexagon":
+        tags.append(str(bibliography.get("persistent_identifier") or record.get("id")))
+    if hexagon:
+        tags.append(
+            f"authorship {hexagon.get('authorship_mode') or '?'}, "
+            f"human understanding {hexagon.get('human_understanding') or '?'}"
+        )
+        if hexagon.get("status") != "published" or hexagon.get("withdrawn_at"):
+            tags.append(f"status {hexagon.get('status')}")
     if bibliography.get("arxiv_id"):
         tags.append(f"arXiv:{bibliography['arxiv_id']}")
     if bibliography.get("doi"):
@@ -149,6 +159,9 @@ def format_record(record: dict[str, object], *, verbose: bool) -> str:
         abstract = str(bibliography.get("abstract") or "")
         if abstract:
             lines.append(f"    {abstract[:300]}{'...' if len(abstract) > 300 else ''}")
+        if hexagon and hexagon.get("provenance_declaration"):
+            declared = " ".join(str(hexagon["provenance_declaration"]).split())
+            lines.append(f"    Hexagon declaration: {declared[:300]}{'...' if len(declared) > 300 else ''}")
         provenance = record.get("metadata_provenance")
         if isinstance(provenance, dict):
             lines.append(f"    provenance: title={provenance.get('title', '-')} authors={provenance.get('authors', '-')}")
@@ -160,7 +173,7 @@ def grep_workspace(root: Path, pattern: str, *, limit: int) -> list[dict[str, ob
     expression = re.compile(pattern, re.IGNORECASE)
     hits: list[dict[str, object]] = []
     searchable: list[Path] = sorted((root / "derived" / "text").glob("*.txt"))
-    for plural in ("arxiv", "papers", "books"):
+    for plural in ("arxiv", "papers", "books", "hexagon"):
         base = root / "items" / plural
         if base.is_dir():
             searchable.extend(sorted(base.glob("*/source/**/*.tex")))
@@ -200,7 +213,7 @@ def main() -> int:
     parser.add_argument(
         "--kind",
         action="append",
-        choices=["arxiv", "paper", "book", "external"],
+        choices=["arxiv", "paper", "book", "hexagon", "external"],
         help="restrict to a kind (repeatable)",
     )
     parser.add_argument("--cited", action="store_true", help="only sources cited somewhere in the repository")

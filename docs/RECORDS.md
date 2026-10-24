@@ -17,10 +17,14 @@ evidence.
 
 ## Durable notes
 
-A note preserves one coherent package: a proof, refutation, reusable
-construction, certified computation, significant correction, durable
-obstruction, or necessary handoff. Several exploratory attempts may mature into
-one note.
+Store notes at `threads/<thread>/notes/YYYY-MM-DD-HHMMSS-<slug>.md`.
+Obtain the filename timestamp and `Date:` from the operating system immediately
+before finalizing; include `Date:` and `Agent:`. Add `## Canonical implications`
+only for actual consequences. A note preserves a coherent proof, refutation,
+reusable construction, certified calculation, significant correction, durable
+obstruction, or necessary handoff.
+
+Several exploratory attempts may mature into one note.
 
 A note does not automatically cause a ledger change. Add canonical implications
 only when the package changes the standing answer, supplies a reusable
@@ -34,7 +38,7 @@ for substantive changes.
 ## Ledger
 
 `LEDGER.md` is present-facing. It normally contains owner direction,
-conventions, the current theory map, durable claims or a catalog pointer,
+conventions, the current theory map, a pointer to the thread's `CLAIMS.md`,
 current opportunities, and only those corrections whose omission would invite
 substantial repeated error.
 
@@ -57,12 +61,20 @@ there. A completed theorem no longer belongs in the opportunity list.
 
 ## Claim catalog
 
-Use `CLAIMS.md` as the compact prerequisite layer for a thread: it contains the
-strongest durable results that a newcomer should know before attempting new
-work. It is not a registry of everything once promoted to a claim, and its
-identifiers are current catalog coordinates rather than permanent archival
-keys. Store the exact statement, status, evidence, and dependencies; keep full
-arguments in notes.
+Every thread carries a `CLAIMS.md` as its compact prerequisite layer: it
+contains the strongest durable results that a newcomer should know before
+attempting new work. Create it with the thread and populate it at the first
+durable claim; a meta, infrastructural, or otherwise unsuitable thread that
+will never hold durable mathematical claims may omit it, with `Claim catalog:
+none` and a short reason in its ledger. It is not a registry of everything
+once promoted to a claim, and its identifiers are current catalog coordinates
+rather than permanent archival keys. Store the exact statement, status,
+evidence, and dependencies; keep full arguments in notes.
+
+Use [`templates/CLAIMS.md`](../templates/CLAIMS.md) as the starting shape. A
+freshly created catalog may hold only its header and the line `No durable
+claims yet.` until the thread's first durable claim; delete that line when the
+first entry lands.
 
 Treat `CLAIMS.md` as a compact citation catalog, not as a self-contained proof
 surface. “Exact statement” means that the hypotheses, conclusion, scope, and
@@ -73,10 +85,10 @@ certificate contents, implementation and verification details, runtimes, and
 route history in the linked note or result. A reader should follow the evidence
 links for the argument.
 
-The normal entry consists only of its identifier and short title, evidence
-status, exact statement, evidence links, and dependencies. Do not copy the
-style of an older oversized entry merely because it is nearby. Existing large
-entries need not be rewritten just for uniformity, but compact one when a
+The normal entry consists only of its identifier and short title,
+evidence status, exact statement, evidence links, and dependencies. Do not copy
+the style of an older oversized entry merely because it is nearby. Existing
+large entries need not be rewritten just for uniformity, but compact one when a
 substantive edit already requires touching it and the exact meaning can be
 preserved safely.
 
@@ -87,7 +99,7 @@ reusable mechanism, or describes the current unresolved frontier. A closed
 finite computation remains only when its exact scope is itself a live reusable
 boundary, not merely because it was once a campaign milestone.
 
-Progressive bound or dimension milestones, proof-internal lemmas, closed
+Progressive dimension or bound milestones, proof-internal lemmas, closed
 subcases of a later theorem, route checkpoints, temporary conjectures, and raw
 experiments belong in notes or results rather than the catalog. Dependencies
 name only other independently useful catalog claims; the evidence note owns the
@@ -95,10 +107,10 @@ internal proof dependency graph.
 
 Each exact claim has one primary thread. Other threads cite
 `<thread>:<claim-id>` rather than maintaining competing formulations. At every
-canonical checkpoint, reconcile the affected claim lineage. If a stronger claim
-makes an older entry unnecessary, delete the older entry regardless of past
-citations, update present-facing canonical references and dependencies, and
-renumber the surviving catalog consecutively. Do not retain alias or
+canonical checkpoint, reconcile the affected claim lineage. If a stronger
+claim makes an older entry unnecessary, delete the older entry regardless of
+past citations, update present-facing canonical references and dependencies,
+and renumber the surviving catalog consecutively. Do not retain alias or
 supersession entries. Historical notes and Git preserve the old numbering and
 need not be rewritten merely for citation compatibility.
 
@@ -112,9 +124,9 @@ uv run python tools/audit_claim_catalog.py --strict <path-to-CLAIMS.md>
 The audit checks consecutive numbering, required fields, legacy metadata,
 explicit proof/detail sections, forbidden supersession entries, and an
 entry-size review guard. It is a structural backstop, not a substitute for
-semantic curation: an agent must still check that no entry is strictly
-subsumed, that each survivor is useful to a new reader, that its statement
-remains mathematically exact, and that its evidence supports its full scope.
+semantic curation: an agent must still check that no entry is strictly subsumed,
+that each survivor is useful to a new reader, that its statement remains
+mathematically exact, and that its evidence supports its full scope.
 
 Use the evidence statuses in `AGENTS.md`, splitting a package when its parts
 require different statuses. The catalog contains statements and provenance,
@@ -139,6 +151,56 @@ rows as the position changes instead of appending session chronology.
 
 Remove or archive active state through ordinary Git history when the complex run
 ends, after absorbing its durable consequences into the ledger or claim catalog.
+
+## Question lists
+
+`QUESTIONS.md` is available for ordinary question lists and historical or
+source-based catalogs. It does not imply a research mode, a six-question cap,
+or a commit-message requirement.
+
+Only a thread running the question-driven variant of a theory-development
+program (`docs/RESEARCH-MODES.md`) carries `RESEARCH-QUESTIONS.md`. In such a
+thread it replaces the ledger's `Current opportunities` as the place where
+work is chosen; the ledger section then only points to it. Start from
+[`templates/RESEARCH-QUESTIONS.md`](../templates/RESEARCH-QUESTIONS.md).
+
+The question list is capped and machine-checked:
+
+- at most six live questions, each headed `## <kebab-id>: <question>`;
+- each with `Serves:`, `Observation:`, `Explanations:`, `Next action:`, and
+  `Either way:`;
+- at most fifteen lines and two links per entry. An entry points to where its
+  observation arose; it does not summarize notes or record results, which
+  belong in notes and `CLAIMS.md`.
+
+A question leaves the list only by being appended verbatim to
+`RESEARCH-QUESTIONS-RETIRED.md` beside it, followed by a line
+`Retired: <YYYY-MM-DD>; <kind>: <reason>`, where the kind is `answered`,
+`refuted`, `superseded by <id>`, `parked`, or `dropped`, as defined in
+`docs/RESEARCH-MODES.md`. A `parked` reason names the obstruction and includes
+`reopen when` followed by its condition. That file is append-only and is not
+boot state, so nothing is lost and little has to be read: only its one-line
+`parked` records are checked, at the end of each run. Reopen a retired
+question by copying it back into the live list.
+
+In such a thread the ledger's `Current theory map` is not a running summary of
+new notes. A new result adds at most one line there, naming the result and
+linking its claim or note; statements and details stay in `CLAIMS.md` and the
+notes. Rewrite an existing map line instead of adding one when the new result
+supersedes or sharpens it.
+
+Every commit touching such a thread names the question worked on with a
+message line `Question: <id>`, or `Question: none` for housekeeping. The Git
+hooks in `tools/hooks/` enforce the caps, the retirement rule, and the trailer
+for these threads only, detected by `RESEARCH-QUESTIONS.md` in the index
+or HEAD (so deletion cannot silently bypass retirement checks). Ordinary
+`QUESTIONS.md` files are not audited by these hooks. They act once installed
+in a checkout with
+`git config core.hooksPath tools/hooks`. A manual check is
+
+```text
+uv run python tools/audit_questions.py threads/<thread>/RESEARCH-QUESTIONS.md
+```
 
 ## Checkpoints
 

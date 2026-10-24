@@ -175,6 +175,61 @@ class PrepareReferenceTests(unittest.TestCase):
             self.assertEqual(metadata["source_pages"], [1])
             self.assertTrue(Path(result["text"]).is_file())
 
+    @unittest.skipUnless(
+        all(shutil.which(command) for command in ("ocrmypdf", "tesseract")),
+        "OCR integration tools are not installed",
+    )
+    def test_explicit_ocr_replaces_bad_text_in_readable_encrypted_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw)
+            visible = fitz.open()
+            page = visible.new_page(width=600, height=800)
+            page.insert_text(
+                (72, 120), "Reusable theorem evidence from the visible scan.", fontsize=18
+            )
+            pixmap = page.get_pixmap(dpi=200, alpha=False)
+            visible.close()
+
+            source = fitz.open()
+            source.new_page(width=600, height=800)
+            page = source.new_page(width=600, height=800)
+            page.insert_image(page.rect, pixmap=pixmap)
+            page.insert_text(
+                (72, 150),
+                "Incorrect hidden text that should not survive explicit optical recognition.",
+                render_mode=3,
+            )
+            pdf = temporary / "readable-encrypted.pdf"
+            source.save(
+                pdf,
+                encryption=fitz.PDF_ENCRYPT_AES_256,
+                owner_pw="fixture-owner",
+                user_pw="",
+            )
+            source.close()
+            original_bytes = pdf.read_bytes()
+
+            result = prepare(
+                pdf,
+                slug="repaired-text",
+                pages_spec="2",
+                mode="ocr",
+                output_root=temporary / "derived",
+            )
+            text = Path(result["text"]).read_text(encoding="utf-8")
+            self.assertIn("Reusable theorem evidence", text)
+            self.assertNotIn("Incorrect hidden text", text)
+            self.assertIn("===== PAGE 2 / 2 =====", text)
+            self.assertEqual(pdf.read_bytes(), original_bytes)
+            metadata = json.loads(Path(result["metadata"]).read_text(encoding="utf-8"))
+            self.assertEqual(metadata["source_original"], str(pdf))
+            self.assertEqual(metadata["source_pages"], [2])
+            self.assertEqual(
+                metadata["preprocessing"][0]["operation"],
+                "remove-empty-password-encryption",
+            )
+            self.assertIn("--force-ocr", metadata["commands"][0])
+
 
 if __name__ == "__main__":
     unittest.main()

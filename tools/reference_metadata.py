@@ -15,6 +15,11 @@ Sources read by preferred order, per field:
 4. `slug`     -- the item key itself
 5. `identifier` -- the arXiv identifier (announcement year only)
 
+A Hexagon item is first described from the public work record its fetcher
+stored as `original/work.json` (`hexagon-api`); the sources above only fill
+fields that record leaves empty. Its arXiv identifier and DOI are kept even when
+empty, since a DOI found in the TeX usually belongs to a cited work.
+
 An externally held source -- a file in the inbox, or an item in a separate
 library outside this workspace -- has no item directory. Where a derivative was
 generated from one, an `external:<slug>` record is written under
@@ -33,6 +38,7 @@ import sys
 import tarfile
 import tempfile
 import unicodedata
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -47,7 +53,8 @@ except ModuleNotFoundError:  # Direct execution: sys.path starts at tools/.
 
 SCHEMA_VERSION = 2
 
-KIND_DIRECTORIES = (("arxiv", "arxiv"), ("papers", "paper"), ("books", "book"))
+KIND_DIRECTORIES = (("arxiv", "arxiv"), ("papers", "paper"), ("books", "book"), ("hexagon", "hexagon"))
+KIND_SINGULAR = dict(KIND_DIRECTORIES)
 
 # Repository trees scanned for the citation back-index. `data/`, `experiments/`,
 # and `lib/` are deliberately excluded: they are multi-gigabyte computation
@@ -839,7 +846,7 @@ def identity_from_legacy(entries: list[str]) -> Identity:
 def identity_from_slug(key: str, kind: str) -> Identity:
     """Last-resort identity: read the item slug as `authors-title`."""
     identity = Identity()
-    if kind == "arxiv":
+    if kind in ("arxiv", "hexagon"):
         return identity
     words = key.split("-")
     identity.title = title_case_words(key)
@@ -856,6 +863,41 @@ def identity_from_slug(key: str, kind: str) -> Identity:
         identity.provenance["authors"] = f"slug:{key}"
         remainder = words[len(surnames) :]
         identity.title = title_case_words("-".join(remainder))
+    return identity
+
+
+def identity_from_hexagon_record(path: Path) -> Identity:
+    """Identity from the Hexagon public work record stored by tools/fetch_hexagon.py."""
+    identity = Identity()
+    try:
+        work = json.loads(path.read_text(encoding="utf-8")).get("work")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return identity
+    if not isinstance(work, dict):
+        return identity
+    locator = f"hexagon-api:{path.parent.name}/{path.name}"
+
+    def note(name: str, value: object, suffix: str = "") -> None:
+        if value not in (None, "", []):
+            setattr(identity, name, value)
+            identity.provenance[name] = locator + suffix
+
+    note("title", re.sub(r"\s+", " ", str(work.get("title") or "")).strip() or None)
+    authors = work.get("authors")
+    if isinstance(authors, list):
+        note("authors", [str(entry["name"]) for entry in authors if isinstance(entry, dict) and entry.get("name")])
+    for stamp in (work.get("versionCreatedAt"), work.get("publishedAt"), work.get("createdAt")):
+        match = YEAR.search(str(stamp or ""))
+        if match:
+            note("year", int(match.group(1)), " (version date)")
+            break
+    note("abstract", str(work.get("abstract") or "").strip() or None)
+    # Hexagon records the arXiv identifier as a submitter declaration it does not verify.
+    note("arxiv_id", work.get("arxivId"), " (submitter-declared, unverified by Hexagon)")
+    note("doi", work.get("doi"))
+    note("venue", "Hexagon preprint")
+    note("keywords", [str(tag) for tag in work.get("tags") or [] if tag])
+    note("msc", [str(code) for code in work.get("mscCodes") or [] if code])
     return identity
 
 
@@ -926,9 +968,9 @@ def slug_to_item(root: Path, catalog_keys: dict[str, str]) -> dict[str, str]:
     for path, payload in derived_records(root):
         slug = derived_slug(path)
         source = derived_source(payload)
-        match = re.search(r"references/items/(arxiv|papers|books)/([^/]+)/", source.replace("\\", "/"))
+        match = re.search(r"references/items/(arxiv|papers|books|hexagon)/([^/]+)/", source.replace("\\", "/"))
         if match:
-            singular = {"arxiv": "arxiv", "papers": "paper", "books": "book"}[match.group(1)]
+            singular = KIND_SINGULAR[match.group(1)]
             mapping[slug] = f"{singular}:{match.group(2)}"
         elif slug in catalog_keys:
             mapping[slug] = catalog_keys[slug]
@@ -937,7 +979,7 @@ def slug_to_item(root: Path, catalog_keys: dict[str, str]) -> dict[str, str]:
 
 def citation_index(repo_root: Path) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Scan tracked repository trees for references to items and derivatives."""
-    item_pattern = re.compile(r"references/items/(arxiv|papers|books)/([A-Za-z0-9._-]+)")
+    item_pattern = re.compile(r"references/items/(arxiv|papers|books|hexagon)/([A-Za-z0-9._-]+)")
     derived_pattern = re.compile(r"references/derived/(?:text|ocr|pages)/([A-Za-z0-9._-]+?)(?:\.metadata)?\.(?:txt|json|pdf|png|jpg)")
     by_item: dict[str, set[str]] = {}
     by_slug: dict[str, set[str]] = {}
@@ -964,7 +1006,7 @@ def citation_index(repo_root: Path) -> tuple[dict[str, list[str]], dict[str, lis
             continue
         display = path.relative_to(repo_root).as_posix()
         for match in item_pattern.finditer(text):
-            singular = {"arxiv": "arxiv", "papers": "paper", "books": "book"}[match.group(1)]
+            singular = KIND_SINGULAR[match.group(1)]
             by_item.setdefault(f"{singular}:{match.group(2)}", set()).add(display)
         for match in derived_pattern.finditer(text):
             slug = match.group(1).removesuffix(".ocr")
@@ -1018,7 +1060,7 @@ def unpack_original(item_path: Path) -> str | None:
             staged = Path(temporary) / "original"
             staged.mkdir()
             _, extracted = install_source(archive, staged, source)
-    except (OSError, RuntimeError, tarfile.TarError, gzip.BadGzipFile, EOFError) as error:
+    except (OSError, RuntimeError, tarfile.TarError, zipfile.BadZipFile, gzip.BadGzipFile, EOFError) as error:
         return f"{archive.name}: {error}"
     return None if extracted else f"{archive.name}: nothing extracted"
 
@@ -1042,6 +1084,10 @@ def build_identity(
     text_paths: list[Path],
 ) -> Identity:
     identity = Identity()
+    record = Identity()
+    if kind == "hexagon":
+        record = identity_from_hexagon_record(item_path / "original" / "work.json")
+        identity.absorb(record, "hexagon-api")
     tex = identity_from_tex(item_path / "source", item_path)
     identity.absorb(tex, "tex")
     for candidate in pdf_identities:
@@ -1056,6 +1102,15 @@ def build_identity(
     identity.absorb(identity_from_legacy(legacy_entries), "legacy")
     identity.absorb(identity_from_slug(key, kind), f"slug:{key}")
 
+    if kind == "hexagon":
+        # The record is authoritative for identifiers even when it has none; a
+        # DOI found in the TeX usually belongs to a bibliography entry.
+        for name in ("arxiv_id", "doi"):
+            setattr(identity, name, getattr(record, name))
+            if name in record.provenance:
+                identity.provenance[name] = record.provenance[name]
+            else:
+                identity.provenance.pop(name, None)
     if kind == "arxiv":
         identity.arxiv_id = key
         identity.provenance["arxiv_id"] = f"identifier:{key}"
@@ -1175,8 +1230,13 @@ def refresh_items(
                             if isinstance(previous_provenance, dict):
                                 identity.provenance[name] = str(previous_provenance[name])
 
-            version = VERSION_SUFFIX.search(key) if singular == "arxiv" else None
-            persistent = f"arXiv:{key}" if singular == "arxiv" else (f"doi:{identity.doi}" if identity.doi else None)
+            version = VERSION_SUFFIX.search(key) if singular in ("arxiv", "hexagon") else None
+            if singular == "arxiv":
+                persistent = f"arXiv:{key}"
+            elif singular == "hexagon":
+                persistent = f"hexagon:{key}"
+            else:
+                persistent = f"doi:{identity.doi}" if identity.doi else None
             exact_version = version.group(0) if version else None
             if isinstance(previous_identity, dict):
                 if "persistent_identifier" in kept:
@@ -1344,6 +1404,20 @@ def surname(name: str) -> str:
     return words[-1] if words else name
 
 
+def hexagon_tags(record: dict[str, object]) -> list[str]:
+    """Short labels for Hexagon's declarations and record status."""
+    hexagon = record.get("hexagon")
+    if not isinstance(hexagon, dict):
+        return []
+    tags = [
+        f"authorship {hexagon.get('authorship_mode') or '?'}",
+        f"human understanding {hexagon.get('human_understanding') or '?'}",
+    ]
+    if hexagon.get("status") != "published" or hexagon.get("withdrawn_at"):
+        tags.append(f"status {hexagon.get('status')}")
+    return tags
+
+
 def index_line(record: dict[str, object]) -> str:
     bibliography = record.get("bibliographic_identity")
     bibliography = bibliography if isinstance(bibliography, dict) else {}
@@ -1353,6 +1427,9 @@ def index_line(record: dict[str, object]) -> str:
     title = str(bibliography.get("title") or "(untitled)")
 
     tags: list[str] = []
+    if record.get("kind") == "hexagon":
+        tags.append(str(bibliography.get("persistent_identifier") or record.get("id")))
+        tags.extend(hexagon_tags(record))
     if bibliography.get("arxiv_id"):
         tags.append(f"arXiv:{bibliography['arxiv_id']}")
     if bibliography.get("doi"):

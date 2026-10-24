@@ -16,8 +16,13 @@ and `setting S`.
 - Owners can begin with [`docs/OWNER-GUIDE.md`](docs/OWNER-GUIDE.md).
 - The worked interaction is in
   [`examples/WORKED-SESSION.md`](examples/WORKED-SESSION.md).
-- The generic literature workflow is in
-  [`docs/LITERATURE.md`](docs/LITERATURE.md).
+- The generic literature workflow, including arXiv and Hexagon sources and
+  forward-citation checks, is in [`docs/LITERATURE.md`](docs/LITERATURE.md);
+  manuscript citation and attribution audits follow
+  [`docs/CITATION-AUDIT.md`](docs/CITATION-AUDIT.md).
+- Research modes, including a question-driven variant in which the agent
+  chooses its next question from its own results, are in
+  [`docs/RESEARCH-MODES.md`](docs/RESEARCH-MODES.md).
 - Computational reproducibility is described in
   [`docs/COMPUTATIONS.md`](docs/COMPUTATIONS.md).
 - Manuscript writing and independent exposition review run through the
@@ -25,7 +30,9 @@ and `setting S`.
   repository keeps only the local overlays in
   [`docs/PAPER-WRITING.md`](docs/PAPER-WRITING.md),
   [`docs/FIRST-READER-REVIEW.md`](docs/FIRST-READER-REVIEW.md), and
-  [`docs/SKEPTICAL-EDITOR-REVIEW.md`](docs/SKEPTICAL-EDITOR-REVIEW.md).
+  [`docs/SKEPTICAL-EDITOR-REVIEW.md`](docs/SKEPTICAL-EDITOR-REVIEW.md), plus
+  writer-side style material in
+  [`docs/MATH-WRITING-ANTI-PATTERNS.md`](docs/MATH-WRITING-ANTI-PATTERNS.md).
 - The fictional canonical state begins at
   [`threads/INDEX.md`](threads/INDEX.md).
 
@@ -51,10 +58,19 @@ To prepare the environment and run the tests:
 ```bash
 uv sync
 uv run python tools/literature_preflight.py
-uv run python -m unittest discover -s tests
+uv run pytest -q
 ```
 
 Run the included Python utilities through `uv`.
+
+To enforce the question-list rules of question-driven programs at commit time,
+install the repository hooks once per checkout:
+
+```bash
+git config core.hooksPath tools/hooks
+```
+
+They act only on threads that carry `RESEARCH-QUESTIONS.md`.
 
 ## Repository map
 
@@ -66,6 +82,8 @@ Run the included Python utilities through `uv`.
 | `STEERING.md` | Current directions that genuinely apply across research threads |
 | `docs/` | Owner guide and focused workflow policies |
 | `templates/` | Optional starting shapes for new records |
+| `.claude/agents/` | Isolated paper-reviewer agent definitions for Claude Code |
+| `evals/` | Optional frozen cases for scoring the paper skills; never shown to an isolated reader |
 | `threads/` | One fictional thread showing present-facing canonical state |
 | `examples/` | A worked conversation-to-checkpoint walkthrough |
 | `lib/` | Maintained reusable research code in any language or system |
@@ -76,7 +94,7 @@ Run the included Python utilities through `uv`.
 | `briefings/` | Optional interface for collaborators without repository access |
 | `references/` | Ignored local source workspace with a tracked usage guide |
 | `.research-scratch/` | Ignored disposable workspace created only when needed |
-| `tools/` | Literature acquisition, preparation, catalog and citation-discovery utilities, the claim-catalog audit, and the manuscript vocabulary check |
+| `tools/` | Literature acquisition (arXiv, Hexagon), preparation, catalog and citation-discovery utilities, the claim-catalog and question-list audits, Git hooks, a serial Lean build helper, and the manuscript vocabulary checks |
 | `tests/` | Offline unit tests for the reusable harness tools |
 
 ## Design principles

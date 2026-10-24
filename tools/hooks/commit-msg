@@ -1,0 +1,14 @@
+#!/bin/sh
+# A commit touching a RESEARCH-QUESTIONS.md program names its question with
+# exactly one "Question: <id>" line, or "Question: none" for housekeeping.
+# Ordinary QUESTIONS.md catalogs alone impose no trailer requirement.
+hooks=$(dirname "$0")
+threads=$("$hooks/questions-threads.sh")
+[ -z "$threads" ] && exit 0
+count=$(grep -Ec '^Question: ([a-z0-9][a-z0-9-]*|none)$' "$1")
+if [ "$count" -ne 1 ]; then
+  echo "commit-msg: changes in a question-driven thread ($threads) need exactly" >&2
+  echo "one 'Question: <id>' line (or 'Question: none'); found $count." >&2
+  echo "Commit once per question worked on." >&2
+  exit 1
+fi

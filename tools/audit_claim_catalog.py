@@ -13,6 +13,7 @@ from typing import Sequence
 CLAIM_HEADING = re.compile(r"(?m)^### (\d+)\. (.+)$")
 REQUIRED_FIELDS = ("Status:", "Statement:", "Evidence:", "Dependencies:")
 LEGACY_METADATA = re.compile(r"(?m)^(Date|Agent|Type|Last corrected|Last extended):")
+EMPTY_CATALOG = re.compile(r"(?im)^No durable claims yet\.?\s*$")
 PROOF_SECTIONS = re.compile(
     r"(?im)^(Proof|Proof sketch|Argument|Verification details|"
     r"Computation details|Implementation details|Runtime):"
@@ -52,7 +53,17 @@ def audit_catalog(path: Path, *, max_entry_lines: int = 60) -> list[Diagnostic]:
     claims = _claim_sections(text)
     diagnostics: list[Diagnostic] = []
     if not claims:
-        return [Diagnostic("error", path, None, "no claim headings found")]
+        if EMPTY_CATALOG.search(text):
+            return []
+        return [
+            Diagnostic(
+                "error",
+                path,
+                None,
+                "no claim headings found; a catalog with no entry yet must say "
+                "'No durable claims yet.'",
+            )
+        ]
 
     numbers = [number for number, _, _ in claims]
     if len(set(numbers)) != len(numbers):

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Enforce RESEARCH-QUESTIONS.md caps and retirement for question-driven
+# programs. Ordinary QUESTIONS.md catalogs are untouched.
+hooks=$(dirname "$0")
+threads=$("$hooks/questions-threads.sh")
+[ -z "$threads" ] && exit 0
+files=$(for thread in $threads; do echo "$thread/RESEARCH-QUESTIONS.md"; done)
+# shellcheck disable=SC2086
+exec uv run --quiet python tools/audit_questions.py --staged $files

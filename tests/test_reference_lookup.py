@@ -71,6 +71,33 @@ ARXIV = {
 }
 
 
+HEXAGON = {
+    "id": "hexagon:2099.00392v2",
+    "kind": "hexagon",
+    "key": "2099.00392v2",
+    "path": "references/items/hexagon/2099.00392v2",
+    "source_file_count": 1,
+    "citation_count": 0,
+    "derivatives": [],
+    "search_text": "determinants over finite fields ann author",
+    "bibliographic_identity": {
+        "title": "Determinants over finite fields",
+        "authors": ["Ann Author"],
+        "year": 2099,
+        "persistent_identifier": "hexagon:2099.00392v2",
+        "keywords": [],
+        "msc": [],
+    },
+    "hexagon": {
+        "authorship_mode": "mixed",
+        "human_understanding": "some",
+        "status": "withdrawn",
+        "withdrawn_at": "2099-11-01",
+        "provenance_declaration": "A mix of   human-written\nand AI-generated text.",
+    },
+}
+
+
 class MatchingTests(unittest.TestCase):
     def test_fold_ignores_case_accents_and_dash_style(self) -> None:
         self.assertEqual(fold("Riemann--Roch"), "riemann-roch")
@@ -119,6 +146,15 @@ class MatchingTests(unittest.TestCase):
         self.assertIn("doi:10.1007/s00026-016-0330-0", rendered)
 
 
+    def test_format_record_shows_hexagon_declarations_and_status(self) -> None:
+        rendered = format_record(HEXAGON, verbose=True)
+        self.assertIn("hexagon:2099.00392v2", rendered)
+        self.assertIn("authorship mixed, human understanding some", rendered)
+        self.assertIn("status withdrawn", rendered)
+        self.assertIn("Hexagon declaration: A mix of human-written and AI-generated text.", rendered)
+        self.assertTrue(matches(HEXAGON, query(kind=["hexagon"])))
+        self.assertFalse(matches(HEXAGON, query(kind=["arxiv"])))
+
 class WorkspaceQueryTests(unittest.TestCase):
     def test_load_catalog_merges_items_and_external_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -146,12 +182,17 @@ class WorkspaceQueryTests(unittest.TestCase):
             (root / "items" / "arxiv" / "1234.5678" / "source" / "main.tex").write_text(
                 "\\section{Finitely generated modules}\n", encoding="utf-8"
             )
+            (root / "items" / "hexagon" / "2099.00392v2" / "source").mkdir(parents=True)
+            (root / "items" / "hexagon" / "2099.00392v2" / "source" / "main.tex").write_text(
+                "All finitely generated ideals are principal.\n", encoding="utf-8"
+            )
 
             hits = grep_workspace(root, "finitely generated", limit=10)
 
-        self.assertEqual(len(hits), 2)
+        self.assertEqual(len(hits), 3)
         self.assertEqual(hits[0]["line"], 2)
         self.assertTrue(hits[1]["path"].endswith("main.tex"))
+        self.assertTrue(any("items/hexagon/" in hit["path"] for hit in hits))
 
 
 if __name__ == "__main__":

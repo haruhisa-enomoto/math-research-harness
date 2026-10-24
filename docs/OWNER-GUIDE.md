@@ -45,9 +45,19 @@ not carry that meaning.
 The agent may edit and compile the live paper. Recording progress, preparing a
 research note, or writing a standalone report does not independently authorize
 paper editing. Once authorized, the agent works to the portable exposition standard carried
-by the paper-writing skill (see [`SKILLS.md`](SKILLS.md)), together with this
+by the paper-writing skills (see [`SKILLS.md`](SKILLS.md)), together with this
 repository's conventions in [`PAPER-WRITING.md`](PAPER-WRITING.md) and any
 style memo in the paper's thread.
+
+> Do citation audit for the sample paper.
+
+The agent checks prior statements, substantially related proof ideas and
+constructions, relevant related work, and the accuracy of existing citations.
+It searches beyond the bibliography and proposes concrete attribution repairs,
+including credit for independently rediscovered results. By default it reports
+findings and proposed wording without editing the manuscript. You can authorize
+implementation afterward or in the same request. See
+[`CITATION-AUDIT.md`](CITATION-AUDIT.md) for the workflow.
 
 ## What the records mean
 

@@ -3,6 +3,18 @@
 Literature work is part of the research evidence chain. Discovery, possession,
 verification, and canonical use are different stages.
 
+For a manuscript citation audit, also follow
+[`CITATION-AUDIT.md`](CITATION-AUDIT.md). That workflow checks missing prior
+results, proof-method attribution, and related work as well as existing
+citations; this document supplies its source-discovery and verification rules.
+
+Read sections 1 and 6 for source selection and evidence. Then load only the
+operation needed: section 2 for workspace or external-library lookup, 3 for
+arXiv or Hexagon fetching, 4 for PDF/DjVu preparation, 5 for catalog lookup or
+maintenance, and 7 for a durable literature record. Catalog lookup precedes
+discovery; source extraction and catalog maintenance are not prerequisites for
+reading already available TeX.
+
 ## 1. Start from the research question
 
 State what the source needs to establish: the exact claim, assumptions,
@@ -12,12 +24,17 @@ rather than by a broad topic label.
 Check the existing local catalog first, with `tools/reference_lookup.py`
 (section 5). It records author, title, year, identifiers, keywords, and
 abstract for every local item, so a source can be found by what it is rather
-than by a remembered identifier or slug. Then use focused public discovery,
-following citations backward or forward when that is useful. Before treating a
-paper-stated conjecture as apparently open, or accepting an agent argument as a
-new full-scope resolution, run the forward-citation check in section 5 against
-the source paper. Prefer primary sources for mathematical claims and control
-the exact version when revisions or publication differences may matter.
+than by a remembered identifier or slug. If an arXiv source exists, identify
+its exact available version and fetch the source with the repository helper; do
+not replace it with a copy from an external library. Use focused public
+discovery to identify unknown sources and locate current versions, following
+citations backward or forward when useful. Before treating a paper-stated
+conjecture as apparently open, or accepting an agent argument as a new
+full-scope resolution, run the forward-citation check in section 5 against the
+source paper. Prefer primary sources for mathematical claims and control the
+exact version when revisions or publication differences may matter. Use a
+targeted external-library lookup for books, older or non-arXiv papers, difficult
+scans, and other sources without usable arXiv source.
 
 Prefer arXiv TeX when it is available: it usually preserves definitions,
 formulas, and structure more reliably than PDF text extraction and provides
@@ -40,6 +57,7 @@ references/
   inbox/                         newly acquired or not yet classified
   items/
     arxiv/<versioned-id>/        fetched source, PDF, and item metadata
+    hexagon/<versioned-id>/      Hexagon record, BibTeX, source, PDF, metadata
     papers/<stable-slug>/        other selected papers
     books/<stable-slug>/         selected books
   derived/
@@ -74,7 +92,7 @@ The entire working collection remains ignored by Git except for
 `references/README.md`. Research notes preserve bibliographic identity and
 checkable locators without committing source artifacts.
 
-## 3. File a known arXiv item
+## 3. File a known arXiv or Hexagon item
 
 Use public search or bibliographic discovery to identify the paper. Once the
 identifiers are known, fetch one or several items directly:
@@ -110,6 +128,33 @@ service’s official
 [bulk-data guidance](https://info.arxiv.org/help/bulk_data/index.html) and
 [API terms](https://info.arxiv.org/help/api/index.html).
 
+### Hexagon works
+
+[Hexagon](https://hexagonmath.org) is a preprint server whose identifiers have
+the same shape as modern arXiv identifiers (`2610.00392v2`). They are distinct
+namespaces: always write a Hexagon work as `hexagon:<id>` and never pass a
+Hexagon identifier to the arXiv helper. File a known work with:
+
+```bash
+uv run python tools/fetch_hexagon.py hexagon:2610.00392v2
+uv run python tools/fetch_hexagon.py https://hexagonmath.org/2610.00392v2
+```
+
+The helper uses Hexagon's public read-only API. It stores the work record
+(`original/work.json`), the BibTeX, the source zip, and the PDF under
+`references/items/hexagon/<versioned-id>/`, and checks the PDF and source files
+against the SHA-256 digests the record publishes. An unversioned identifier is
+resolved to the current version and filed under it. The same `--source-only`,
+`--pdf-only`, and `--force` options apply.
+
+The record supplies the catalog's title, authors, abstract, MSC codes, and
+tags, and is authoritative for the arXiv identifier and DOI. A Hexagon arXiv
+identifier is a submitter declaration that Hexagon does not verify. The item
+also keeps Hexagon's declarations in its `hexagon` field: authorship mode
+(for example `mixed` human/AI), human-understanding level, the free-text
+provenance statement, and withdrawal status. `reference_lookup.py` shows them;
+`--kind hexagon` restricts a search to Hexagon items.
+
 ## 4. Prepare PDF or DjVu sources
 
 First check `references/derived/text/` and the local catalog for an existing
@@ -133,9 +178,11 @@ The original is never modified. Text and metadata go under
 Metadata records the source hash, page map, selected mode, tool versions,
 subprocess commands, and invocation.
 
-Use `--mode extract` to require an existing text layer, `--mode ocr` to force a
-new searchable derivative, and `--language` to select installed recognition
-languages. Focused page ranges are preferable for large books. See
+Use `--mode extract` to require an existing text layer, `--mode ocr` to replace
+the text on the selected pages by OCR (including a garbled existing layer),
+and `--language` to select installed recognition languages. For PDFs readable
+with an empty password, the helper records and uses a temporary unencrypted
+copy for OCR. Focused page ranges are preferable for large books. See
 [`ENVIRONMENT.md`](ENVIRONMENT.md) for optional dependencies.
 
 Render pages only when layout, a diagram, or visual verification of
@@ -212,8 +259,9 @@ uv run python tools/reference_citations.py doi:10.1000/example.2099.001
 uv run python tools/reference_citations.py "Finiteness properties of rings of invariants"
 ```
 
-The helper accepts an arXiv identifier or official URL, a DOI or DOI URL, or an
-exact title. It first enriches the query from `CATALOG.json`, then queries
+The helper accepts an arXiv identifier or official URL, a DOI or DOI URL,
+`hexagon:<id>` or a hexagonmath.org URL, or an exact title. A bare identifier
+is always read as arXiv. It first enriches the query from `CATALOG.json`, then queries
 Semantic Scholar and OpenAlex sequentially, exhausts their pagination,
 normalizes the returned metadata, and deduplicates citing works by arXiv ID,
 DOI, and bibliographic identity. Semantic Scholar runs first because it accepts
@@ -227,17 +275,34 @@ exits nonzero. A provider lookup, resolution, or pagination failure also
 preserves any results obtained from the other provider but exits nonzero, so
 partial coverage cannot silently pass as a completed check.
 
-The helper reads a Semantic Scholar key, when available, from
-`SEMANTIC_SCHOLAR_API_KEY`, and an OpenAlex key from `OPENALEX_API_KEY`.
-Provide the free OpenAlex key rather than assuming anonymous service will
-remain available. Do not put keys in command arguments or repository files. The
-ordinary `RESEARCH_HARNESS_USER_AGENT` setting also applies.
+The helper reads `SEMANTIC_SCHOLAR_API_KEY` and `OPENALEX_API_KEY` from a
+git-ignored `.env` at the repository root through `python-dotenv`; variables
+already set in the environment take precedence. Any agent running the helper
+from the checkout then uses the keys without further setup; a separate clone or
+worktree needs its own `.env`. Anonymous access to both services shares a
+public quota and often fails with HTTP 429 or 503, so provide at least the free
+OpenAlex key. Never commit `.env` or put keys in command arguments or tracked
+files. The ordinary `RESEARCH_HARNESS_USER_AGENT` setting also applies.
+
+Semantic Scholar requests are spaced at least 1.1 s apart, its per-key limit.
+Rate limits and temporary provider failures are retried with exponential
+backoff, or longer when the provider asks, noted on stderr, so a lookup can
+take a minute or more before it reports a provider error.
+
+For a Hexagon target, the helper takes the title and any declared arXiv
+identifier or DOI from the local catalog or the Hexagon record and queries the
+providers with those. Semantic Scholar and OpenAlex may not index Hexagon at
+all, and Hexagon has no reverse-citation search, so Hexagon works citing any
+source (Hexagon or arXiv) are invisible to the helper. When Hexagon activity
+matters, also search Hexagon directly by topic, for example
+`https://hexagonmath.org/api/v1/works?q=<term>` (terms are limited to 50
+bytes).
 
 Citation-graph coverage is uneven. A provider reporting zero citations is not
 evidence that there are none, and the helper's `complete` field means only that
 every enabled provider resolved and paginated successfully. It does not mean
 that their combined scholarly graph is universally complete. Treat an
-independent "cited by" inspection, where one is available, as a useful
+independent "cited by" inspection, such as Google Scholar where available, as a useful
 additional safety check rather than as something the helper has reproduced.
 
 The returned records are discovery leads, not checked citations. For each
@@ -305,6 +370,12 @@ For a load-bearing source, verify:
   otherwise use a section, page, or theorem number already present in a
   reusable derivative, or a stable local text location. Do not open a PDF
   merely to make the locator more ornate.
+
+For a Hexagon source, read its authorship and human-understanding declarations
+before relying on it. They are the submitter's statements, not checks, and a
+work declared as AI-generated or only partly understood by a human needs the
+same scrutiny as an unchecked agent proof before it supports
+`proved/literature`.
 
 If text extraction or character recognition may have altered a formula,
 hypothesis, or symbol, inspect the source image. Verification effort should

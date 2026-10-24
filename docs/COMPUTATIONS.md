@@ -4,6 +4,13 @@ Projects may use GAP, SageMath, Mathematica, Macaulay2, Magma, Lean, Python,
 Julia, Rust, or other systems suited to the research. These rules explain how
 to preserve computational evidence so that it can be checked later.
 
+Read Choosing and recording backends before depending on an engine, and Search
+discipline before any search. For durable results read Working layers, Durable
+computation package, Data is local, Evidence scope, and Independent
+verification; counterexamples additionally require Counterexamples and
+refutations. Disposable probes keep the backend and exactness rules but need no
+durable package.
+
 ## Choosing and recording backends
 
 A project normally settles on one computational engine for its central
@@ -26,7 +33,9 @@ performance workaround. Host-language linear algebra or combinatorics is
 appropriate when it does not replace a computation the engine owns, or when an
 independently motivated verifier has been deliberately authorized. This applies
 to disposable probes as well: scratch status relaxes record-keeping, not the
-engine boundary.
+engine boundary. A construction taken from the literature is no exemption: computing
+an invariant of a complex, resolution, or presentation copied from a paper is
+an engine computation.
 
 The engine boundary is also an audit boundary. Two bindings onto the same engine
 agree by construction, so their agreement is not verification evidence at all.
@@ -42,6 +51,24 @@ unreleased change. A durable record states the engine and its version, the
 coefficient domain or arithmetic used, and the conventions the result depends
 on. A computation over a particular field, characteristic, or precision has
 only that scope unless a separate argument extends it.
+
+Read the engine version at runtime (for a Python package, for example with
+`importlib.metadata.version`) rather than hard-coding it in a record, and do not
+gate preflight, execution, or certificate reuse on a commit allowlist. A new
+release of a pinned engine does not by itself require regenerating results that
+passed under an earlier one.
+
+### Completeness certificates
+
+Prefer an enumeration method whose termination certifies completeness, such as
+closing a finite seed set under a generation process that a theorem shows must
+reach every object, over a census bounded by size, degree, or length. Run such
+a method without a cap when finiteness is known or expected; use a finite cap
+only as an explicit resource guard for a diagnostic, and treat a cap hit as
+incomplete evidence even when neighbouring cases finish. A bounded census is
+exhaustive only through its stated bound. Two convenient cutoffs that happen to
+agree do not make it complete. Supply an independently known count, when one
+exists, as an additional cross-check.
 
 ## Working layers
 
@@ -76,11 +103,11 @@ Use matching descriptive basenames in `data/<thread>/` and
 
 ## Data is local
 
-`.gitignore` excludes all of `data/` except its README. This is deliberate.
-Do not track a file under `data/`, do not stage one with `git add -f`, and do
-not relax the `data/*` rule to get an output committed. An output that seems too
-important to lose is not an exception; it is a reason to write a better
-manifest.
+`.gitignore` excludes all of `data/` except its README. This is deliberate and
+permanent. Do not track a file under `data/`, do not stage one with `git add
+-f`, and do not relax the `data/*` rule to get an output committed. An output
+that seems too important to lose is not an exception; it is a reason to write a
+better manifest.
 
 Machine-readable outputs therefore exist on local disk only. The tracked record
 of a computation is its `results/<thread>/` summary, which must carry the
@@ -89,12 +116,12 @@ expected invariants or hashes, and the `data/` path where the output sits.
 Write it as if the output were unavailable to the reader, because for anyone
 cloning the repository it is.
 
-Validation effort is proportional to mathematical and implementation risk. For
-a deterministic closed computation, one successful complete run plus targeted
-sanity checks is normally sufficient. Do not rerun a broad search solely to
-demonstrate byte-for-byte reproducibility. A hash is optional for a small
-deterministic artifact; it is most useful for large or externally stored
-output, transfer integrity, or later comparison.
+Validation effort is proportional to mathematical and implementation risk.
+For a deterministic closed computation, one successful complete run plus
+targeted sanity checks is normally sufficient. Do not rerun a broad search
+solely to demonstrate byte-for-byte reproducibility. A hash is optional for a
+small checked-in deterministic artifact; it is most useful for large or
+externally stored output, transfer integrity, or later comparison.
 
 Run tests that exercise changed reusable code or a concrete failure risk. A
 full repository test suite is appropriate after broad shared-library or
@@ -106,21 +133,23 @@ changes, candidate counterexamples, and unusually load-bearing results.
 
 ## Search discipline
 
-Search campaigns work in strata. A stratum is a finite list of cases with a
-clear boundary. Close it completely and state exact counts. Do not use
-open-ended random sampling as a substitute for strata.
+For exact finite searches, use strata with explicit case boundaries and close
+each claimed stratum completely. Reduce cases by justified symmetries, avoid
+recomputing certified closed regions, and report exact scope and counts.
+Human-facing exact hunts default to no coverage caps. An optimization budget
+must fall through to complete work; a bounded diagnostic labels its incomplete
+scope. Sampling does not certify an exact stratum.
 
-- Reduce the case list by symmetry before computing. Search the reduced list,
-  not the raw one.
-- Start each stratum at the edge of what is already proved or excluded. Do not
-  recompute inside closed regions.
-- Report exact scope: "all 900 pairs", not "about 26k candidates".
-- Before a long batch job, time a small pilot and estimate the total. If the
-  estimate is much over an hour, shrink or split the job.
-- Never idle on a background job. If a job must run long, park it and close
-  another stratum meanwhile. Harvest streamed output early.
-- Stop a job when it only repeats known outcomes. Record the partial scope
-  honestly.
+Time a small pilot before a long job. Split or checkpoint expensive work without
+shrinking an authorized exact target. Repeated known outcomes justify stopping
+an exploratory probe, but do not excuse missing exact-search coverage unless
+a valid mathematical pruning argument removes those cases. Report an interrupted
+search's partial scope honestly. Operational failures checkpoint evidence and
+stop loudly; repeating the same command retries automatically.
+
+While a long job runs, pursue useful independent in-scope work when available;
+do not create another stratum merely to stay busy. Harvest streamed evidence
+and monitor the run as needed.
 
 ## Evidence scope
 

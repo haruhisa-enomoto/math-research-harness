@@ -10,20 +10,28 @@ Examples:
     uv run python tools/reference_citations.py doi:10.1142/S0219498825500185
     uv run python tools/reference_citations.py "On non-counital Frobenius algebras"
     uv run python tools/reference_citations.py arxiv:2204.14182 --json
+    uv run python tools/reference_citations.py hexagon:2610.00392v2
 
 Semantic Scholar is queried first because it accepts arXiv identifiers
 directly. Metadata resolved there and in the local catalog is then available
 to OpenAlex, whose work lookup is strongest with a DOI or exact title.
+
+A Hexagon (hexagonmath.org) work is resolved to its title, declared arXiv
+identifier, and DOI through the local catalog or Hexagon's read-only API, then
+looked up by those. The scholarly graphs may not index Hexagon at all, and
+Hexagon offers no reverse-citation search, so the result says so.
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
 import sys
 import time
+import unicodedata
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Callable
@@ -31,9 +39,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
+from dotenv import load_dotenv
+
 try:
+    from tools.fetch_hexagon import HEXAGON_BASE, HEXAGON_HOSTS, normalize_hexagon_id
     from tools.reference_lookup import fold, identity, load_catalog
 except ModuleNotFoundError:  # Direct execution starts with tools/ on sys.path.
+    from fetch_hexagon import HEXAGON_BASE, HEXAGON_HOSTS, normalize_hexagon_id
     from reference_lookup import fold, identity, load_catalog
 
 SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1"
@@ -57,6 +69,26 @@ OPENALEX_SELECT = (
     "id,display_name,title,doi,ids,publication_year,publication_date,"
     "authorships,primary_location,cited_by_count"
 )
+# Private provider keys live in the git-ignored `.env` at the repository root.
+DOTENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+MAX_ATTEMPTS = 6
+MAX_RETRY_DELAY = 60.0
+# Semantic Scholar allows one request per second for each API key.
+MIN_REQUEST_INTERVAL = {"api.semanticscholar.org": 1.1}
+_last_request: dict[str, float] = {}
+RETRY_HINT = re.compile(r"retry in (\d+(?:\.\d+)?)\s*s", re.I)
+TEX_COMMAND = re.compile(r"\\([a-z]+)")
+GREEK_NAMES = frozenset(
+    "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi "
+    "omicron pi rho sigma tau upsilon phi chi psi omega".split()
+)
+
+
+HEXAGON_COVERAGE_NOTE = (
+    " The target is a Hexagon work: the providers were queried by its title"
+    " and any submitter-declared arXiv ID or DOI, may not index Hexagon, and"
+    " cannot see Hexagon works that cite it."
+)
 
 
 class CitationLookupError(RuntimeError):
@@ -69,6 +101,7 @@ class SourceQuery:
     arxiv_id: str | None = None
     doi: str | None = None
     title: str | None = None
+    hexagon_id: str | None = None
 
 
 JsonRequester = Callable[[str, dict[str, str], int], dict[str, object]]
@@ -111,10 +144,27 @@ def arxiv_from_value(value: str) -> str | None:
     return candidate if ARXIV_ID.fullmatch(candidate) else None
 
 
+def hexagon_from_value(value: str) -> str | None:
+    """A Hexagon identifier, only when the value says Hexagon explicitly.
+
+    Hexagon and modern arXiv identifiers share one shape, so a bare
+    `2610.00392v2` stays an arXiv identifier here.
+    """
+    candidate = value.strip()
+    if candidate.casefold().startswith("hexagon:"):
+        return normalize_hexagon_id(candidate)
+    if "://" in candidate and urlparse(candidate).netloc.casefold() in HEXAGON_HOSTS:
+        return normalize_hexagon_id(candidate)
+    return None
+
+
 def parse_source_query(value: str) -> SourceQuery:
     raw = value.strip()
     if not raw:
         raise ValueError("empty source query")
+    hexagon_id = hexagon_from_value(raw)
+    if hexagon_id:
+        return SourceQuery(raw=raw, hexagon_id=hexagon_id)
     arxiv_id = arxiv_from_value(raw)
     if arxiv_id:
         return SourceQuery(raw=raw, arxiv_id=arxiv_id)
@@ -135,7 +185,13 @@ def enrich_from_catalog(query: SourceQuery, root: Path) -> SourceQuery:
         recorded_arxiv = str(bibliography.get("arxiv_id") or "")
         recorded_doi = str(bibliography.get("doi") or "")
         recorded_title = str(bibliography.get("title") or "")
-        if query.arxiv_id and recorded_arxiv:
+        recorded_persistent = str(bibliography.get("persistent_identifier") or "")
+        if query.hexagon_id:
+            if recorded_persistent.casefold().startswith("hexagon:") and unversioned_arxiv(
+                recorded_persistent.split(":", 1)[1]
+            ) == unversioned_arxiv(query.hexagon_id):
+                matches.append(bibliography)
+        elif query.arxiv_id and recorded_arxiv:
             if unversioned_arxiv(recorded_arxiv) == unversioned_arxiv(query.arxiv_id):
                 matches.append(bibliography)
         elif query.doi and recorded_doi:
@@ -162,9 +218,62 @@ def enrich_from_catalog(query: SourceQuery, root: Path) -> SourceQuery:
     return replace(query, arxiv_id=arxiv_id, doi=doi, title=title)
 
 
+def resolve_hexagon(
+    query: SourceQuery,
+    *,
+    requester: JsonRequester,
+    headers: dict[str, str],
+    timeout: int,
+) -> SourceQuery:
+    """Fill title and declared identifiers of a Hexagon work from its public record."""
+    if not query.hexagon_id or query.title:
+        return query
+    raw = requester(f"{HEXAGON_BASE}/api/v1/works/{query.hexagon_id}", headers, timeout)
+    work = raw.get("work") if isinstance(raw, dict) else None
+    if not isinstance(work, dict) or not work.get("title"):
+        raise CitationLookupError(f"Hexagon record for {query.hexagon_id} has no title")
+    doi = query.doi
+    if not doi and work.get("doi"):
+        try:
+            doi = normalize_doi(str(work["doi"]))
+        except ValueError:
+            pass
+    arxiv_id = query.arxiv_id or (str(work["arxivId"]) if work.get("arxivId") else None)
+    return replace(query, title=str(work["title"]), arxiv_id=arxiv_id, doi=doi)
+
+
+def wait_for_turn(host: str) -> None:
+    """Space requests to one provider by its minimum interval."""
+    interval = MIN_REQUEST_INTERVAL.get(host, 0.0)
+    if host in _last_request:
+        remaining = interval - (time.monotonic() - _last_request[host])
+        if remaining > 0:
+            time.sleep(remaining)
+    _last_request[host] = time.monotonic()
+
+
+def retry_delay(
+    attempt: int, retry_after: str | None = None, detail: str = ""
+) -> float:
+    """Back off exponentially, honouring any longer wait the provider asks for."""
+    delay = float(2 ** (attempt + 1))
+    hints = [retry_after or ""]
+    if match := RETRY_HINT.search(detail):
+        hints.append(match.group(1))
+    for hint in hints:
+        try:
+            delay = max(delay, float(hint))
+        except ValueError:
+            continue
+    return min(delay, MAX_RETRY_DELAY)
+
+
 def request_json(url: str, headers: dict[str, str], timeout: int) -> dict[str, object]:
     request = Request(url, headers=headers)
-    for attempt in range(3):
+    host = urlparse(url).netloc
+    for attempt in range(MAX_ATTEMPTS):
+        last_attempt = attempt == MAX_ATTEMPTS - 1
+        wait_for_turn(host)
         try:
             with urlopen(request, timeout=timeout) as response:
                 body = response.read().decode("utf-8")
@@ -172,20 +281,21 @@ def request_json(url: str, headers: dict[str, str], timeout: int) -> dict[str, o
         except HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace").strip()[:500]
             retryable = error.code == 429 or 500 <= error.code < 600
-            if retryable and attempt < 2:
-                retry_after = error.headers.get("Retry-After")
-                try:
-                    delay = min(max(float(retry_after or 0), 1.0), 10.0)
-                except ValueError:
-                    delay = float(2**attempt)
+            if retryable and not last_attempt:
+                delay = retry_delay(attempt, error.headers.get("Retry-After"), detail)
+                print(
+                    f"{host}: HTTP {error.code}; retrying in {delay:.0f} s "
+                    f"(attempt {attempt + 2}/{MAX_ATTEMPTS})",
+                    file=sys.stderr,
+                )
                 time.sleep(delay)
                 continue
             raise CitationLookupError(
                 f"HTTP {error.code} from provider: {detail or error.reason}"
             ) from error
         except URLError as error:
-            if attempt < 2:
-                time.sleep(float(2**attempt))
+            if not last_attempt:
+                time.sleep(retry_delay(attempt))
                 continue
             raise CitationLookupError(
                 f"provider request failed: {error.reason}"
@@ -309,12 +419,56 @@ def openalex_paper(raw: dict[str, object]) -> dict[str, object]:
     return paper
 
 
+def greek_word(character: str) -> str:
+    name = unicodedata.name(character, "")
+    if not name.startswith("GREEK SMALL LETTER "):
+        return character
+    word = name.removeprefix("GREEK SMALL LETTER ").lower().replace("lamda", "lambda")
+    return f" {word.removeprefix('final ')} "
+
+
+def tex_word(command: str) -> str:
+    word = command.removeprefix("var")
+    return f" {word} " if word in GREEK_NAMES else " "
+
+
+def title_words(value: str) -> list[str]:
+    """Words of a title with markup, TeX commands, and Greek letters normalized.
+
+    Providers render the same title as `$\\zeta$-functions`, `<i>ζ</i>-functions`,
+    or `𝜁-functions`; all of these become the words `zeta functions`.
+    """
+    text = fold(re.sub(r"<[^>]+>", " ", html.unescape(value)))
+    text = TEX_COMMAND.sub(lambda match: tex_word(match.group(1)), text)
+    text = "".join(greek_word(character) for character in text)
+    return re.findall(r"[^\W_]+", text)
+
+
+def title_key(value: str) -> str:
+    """Compare titles while ignoring spacing, punctuation, and notation."""
+    return "".join(title_words(value))
+
+
+def search_text(value: str) -> str:
+    """Plain words for provider search, where `?`, `*`, `,`, `-` are syntax.
+
+    Greek letters are left out: a provider may index `Λ` or `$\\Lambda$`,
+    so the spelled name `lambda` would only hurt recall. Matching still
+    compares them through `title_key`.
+    """
+    return " ".join(word for word in title_words(value) if word not in GREEK_NAMES)
+
+
 def exact_title(candidates: list[dict[str, object]], title: str) -> dict[str, object]:
+    wanted = title_key(title)
     exact = [
         candidate
         for candidate in candidates
-        if fold(str(candidate.get("title") or candidate.get("display_name") or ""))
-        == fold(title)
+        if wanted
+        and title_key(
+            str(candidate.get("title") or candidate.get("display_name") or "")
+        )
+        == wanted
     ]
     if len(exact) == 1:
         return exact[0]
@@ -366,7 +520,7 @@ def semantic_target(
     url = with_query(
         f"{SEMANTIC_SCHOLAR_BASE}/paper/search",
         {
-            "query": query.title,
+            "query": search_text(query.title),
             "limit": 10,
             "fields": SEMANTIC_FIELDS,
         },
@@ -444,6 +598,38 @@ def openalex_url(path: str, params: dict[str, object]) -> str:
     return with_query(f"{OPENALEX_BASE}{path}", params)
 
 
+def openalex_title_candidates(
+    title: str,
+    *,
+    requester: JsonRequester,
+    headers: dict[str, str],
+    timeout: int,
+) -> list[dict[str, object]]:
+    """Union general search with title-only search.
+
+    General search can bury a short title under popular works; the title
+    filter finds it, while general search still surfaces duplicate records.
+    """
+    text = search_text(title)
+    if not text:
+        raise CitationLookupError(f"title has no searchable words: {title!r}")
+    candidates: dict[str, dict[str, object]] = {}
+    for search in ({"search": text}, {"filter": f"title.search:{text}"}):
+        payload = requester(
+            openalex_url(
+                "/works",
+                {**search, "per_page": 25, "select": OPENALEX_SELECT},
+            ),
+            headers,
+            timeout,
+        )
+        data = payload.get("results")
+        for item in data if isinstance(data, list) else []:
+            if isinstance(item, dict):
+                candidates.setdefault(str(item.get("id") or len(candidates)), item)
+    return list(candidates.values())
+
+
 def openalex_target(
     query: SourceQuery,
     *,
@@ -451,44 +637,37 @@ def openalex_target(
     headers: dict[str, str],
     timeout: int,
 ) -> tuple[dict[str, object], dict[str, object]]:
-    title_error = None
+    errors: list[str] = []
     if query.title:
         try:
-            payload = requester(
-                openalex_url(
-                    "/works",
-                    {
-                        "search": query.title,
-                        "per_page": 10,
-                        "select": OPENALEX_SELECT,
-                    },
-                ),
-                headers,
-                timeout,
-            )
-            data = payload.get("results")
-            candidates = (
-                [item for item in data if isinstance(item, dict)]
-                if isinstance(data, list)
-                else []
+            candidates = openalex_title_candidates(
+                query.title,
+                requester=requester,
+                headers=headers,
+                timeout=timeout,
             )
             raw = exact_title(candidates, query.title)
             return raw, openalex_paper(raw)
         except CitationLookupError as error:
-            title_error = error
-    if query.doi:
-        encoded = quote(f"https://doi.org/{query.doi}", safe=":/")
-        raw = requester(
-            openalex_url(f"/works/{encoded}", {"select": OPENALEX_SELECT}),
-            headers,
-            timeout,
-        )
-        return raw, openalex_paper(raw)
-    if title_error:
-        raise title_error
-    raise CitationLookupError(
-        "OpenAlex needs a DOI or an exact title resolved from another source"
-    )
+            errors.append(str(error))
+    dois = [query.doi] if query.doi else []
+    if query.arxiv_id:
+        # arXiv registers a DataCite DOI for every preprint.
+        dois.append(f"10.48550/arxiv.{unversioned_arxiv(query.arxiv_id)}")
+    for doi in dois:
+        encoded = quote(f"https://doi.org/{doi}", safe=":/")
+        try:
+            raw = requester(
+                openalex_url(f"/works/{encoded}", {"select": OPENALEX_SELECT}),
+                headers,
+                timeout,
+            )
+            return raw, openalex_paper(raw)
+        except CitationLookupError as error:
+            errors.append(f"doi:{doi}: {error}")
+    if errors:
+        raise CitationLookupError("; ".join(errors))
+    raise CitationLookupError("OpenAlex needs a DOI, an arXiv ID, or an exact title")
 
 
 def openalex_citations(
@@ -647,6 +826,9 @@ def lookup_citations(
         "User-Agent": user_agent,
         "Accept": "application/json",
     }
+    query = resolve_hexagon(
+        query, requester=requester, headers=common_headers, timeout=timeout
+    )
     semantic_headers = dict(common_headers)
     semantic_key = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
     if semantic_key:
@@ -718,6 +900,7 @@ def lookup_citations(
             "Complete means every enabled provider paginated "
             "successfully; no scholarly graph guarantees complete "
             "citation coverage."
+            + (HEXAGON_COVERAGE_NOTE if query.hexagon_id else "")
         ),
     }
 
@@ -740,6 +923,8 @@ def print_human(result: dict[str, object]) -> None:
     )
     print(f"Target: {target}")
     identifiers = []
+    if query.get("hexagon_id"):
+        identifiers.append(f"hexagon:{query['hexagon_id']}")
     if query.get("arxiv_id"):
         identifiers.append(f"arXiv:{query['arxiv_id']}")
     if query.get("doi"):
@@ -799,7 +984,7 @@ def main() -> int:
     )
     parser.add_argument(
         "source",
-        help=("arXiv ID, DOI, official identifier URL, or exact title"),
+        help=("arXiv ID, DOI, hexagon:<id>, official identifier URL, or exact title"),
     )
     parser.add_argument("--root", type=Path, default=Path("references"))
     parser.add_argument(
@@ -833,6 +1018,8 @@ def main() -> int:
         help="emit machine-readable JSON",
     )
     args = parser.parse_args()
+    # Keys already in the environment take precedence over `.env`.
+    load_dotenv(DOTENV_PATH)
     if args.max_results < 0:
         parser.error("--max-results must be nonnegative")
     if args.timeout < 1:
